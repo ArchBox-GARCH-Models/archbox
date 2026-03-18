@@ -94,9 +94,9 @@ class TestVsRugarchGARCH:
                     assert_param_close(ab_params[ab_key], r_params[key], tol_pct, key)
 
         # Log-likelihood
-        assert (
-            abs(results.loglike - fixture["loglikelihood"]) < tol_ll
-        ), f"loglike: archbox={results.loglike:.2f}, R={fixture['loglikelihood']:.2f}"
+        assert abs(results.loglike - fixture["loglikelihood"]) < tol_ll, (
+            f"loglike: archbox={results.loglike:.2f}, R={fixture['loglikelihood']:.2f}"
+        )
 
     @pytest.mark.xfail(reason="Student-t distribution not yet implemented")
     def test_garch11_studentt(self) -> None:
@@ -123,9 +123,9 @@ class TestVsRugarchGARCH:
         results = model.fit(disp=False)
 
         assert results.params is not None
-        assert (
-            abs(results.loglike - fixture["loglikelihood"]) < tol_ll
-        ), f"loglike: archbox={results.loglike:.2f}, R={fixture['loglikelihood']:.2f}"
+        assert abs(results.loglike - fixture["loglikelihood"]) < tol_ll, (
+            f"loglike: archbox={results.loglike:.2f}, R={fixture['loglikelihood']:.2f}"
+        )
 
     def test_gjr11_normal(self) -> None:
         """GJR-GARCH(1,1) Normal vs rugarch."""
@@ -138,9 +138,9 @@ class TestVsRugarchGARCH:
         results = model.fit(disp=False)
 
         assert results.params is not None
-        assert (
-            abs(results.loglike - fixture["loglikelihood"]) < tol_ll
-        ), f"loglike: archbox={results.loglike:.2f}, R={fixture['loglikelihood']:.2f}"
+        assert abs(results.loglike - fixture["loglikelihood"]) < tol_ll, (
+            f"loglike: archbox={results.loglike:.2f}, R={fixture['loglikelihood']:.2f}"
+        )
 
     def test_aparch11_normal(self) -> None:
         """APARCH(1,1) Normal vs rugarch."""
@@ -153,9 +153,9 @@ class TestVsRugarchGARCH:
         results = model.fit(disp=False)
 
         assert results.params is not None
-        assert (
-            abs(results.loglike - fixture["loglikelihood"]) < tol_ll
-        ), f"loglike: archbox={results.loglike:.2f}, R={fixture['loglikelihood']:.2f}"
+        assert abs(results.loglike - fixture["loglikelihood"]) < tol_ll, (
+            f"loglike: archbox={results.loglike:.2f}, R={fixture['loglikelihood']:.2f}"
+        )
 
 
 class TestParameterConsistency:

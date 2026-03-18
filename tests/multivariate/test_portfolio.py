@@ -90,9 +90,9 @@ class TestMinimumVariancePortfolio:
         var_mv = float(w_mv @ H @ w_mv)
         var_eq = float(w_eq @ H @ w_eq)
 
-        assert (
-            var_mv <= var_eq + 1e-10
-        ), f"MV variance ({var_mv:.6f}) should be <= equal weight ({var_eq:.6f})"
+        assert var_mv <= var_eq + 1e-10, (
+            f"MV variance ({var_mv:.6f}) should be <= equal weight ({var_eq:.6f})"
+        )
 
     def test_mv_weights_dynamic_shape(self):
         """Dynamic MV weights should have correct shape."""

@@ -71,9 +71,9 @@ class TestNewsImpact:
         neg_response = sigma2_response[mid - mid // 2]
         pos_response = sigma2_response[mid + mid // 2]
 
-        assert (
-            neg_response > pos_response
-        ), "GJR-GARCH: negative shock should produce higher variance"
+        assert neg_response > pos_response, (
+            "GJR-GARCH: negative shock should produce higher variance"
+        )
 
     def test_news_impact_returns_correct_shape(self, sp500_returns: np.ndarray):
         from archbox.models.garch import GARCH
@@ -129,9 +129,9 @@ class TestIntegrationAllModels:
             model = model_fn(sp500_returns)
             results = model.fit(disp=False)
             assert results is not None, f"{name} fit returned None"
-            assert np.isfinite(
-                results.loglike
-            ), f"{name} loglikelihood is not finite: {results.loglike}"
+            assert np.isfinite(results.loglike), (
+                f"{name} loglikelihood is not finite: {results.loglike}"
+            )
             results_list.append((name, results))
 
         # All models should have fit successfully

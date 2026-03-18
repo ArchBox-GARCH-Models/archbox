@@ -80,9 +80,9 @@ class TestHamilton1989GDP:
 
         # Recession regime should have lower mean
         # Expansion regime should have higher mean
-        assert (
-            sorted_means[0] < sorted_means[1]
-        ), f"Recession mean should be < expansion mean: {sorted_means}"
+        assert sorted_means[0] < sorted_means[1], (
+            f"Recession mean should be < expansion mean: {sorted_means}"
+        )
 
         # Log-likelihood should be finite
         assert np.isfinite(results.loglike)

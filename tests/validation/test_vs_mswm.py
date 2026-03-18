@@ -48,9 +48,9 @@ class TestVsMSwM:
         assert np.isfinite(results.loglike)
 
         # Log-likelihood comparison
-        assert (
-            abs(results.loglike - fixture["loglikelihood"]) < tol_ll
-        ), f"MS-AR loglike: archbox={results.loglike:.2f}, R={fixture['loglikelihood']:.2f}"
+        assert abs(results.loglike - fixture["loglikelihood"]) < tol_ll, (
+            f"MS-AR loglike: archbox={results.loglike:.2f}, R={fixture['loglikelihood']:.2f}"
+        )
 
         # Transition matrix
         trans = results.transition_matrix
@@ -60,13 +60,13 @@ class TestVsMSwM:
 
         # Transition probabilities (within tolerance)
         if "p_00" in r_params:
-            assert (
-                abs(trans[0, 0] - r_params["p_00"]) < tol_pct * r_params["p_00"] + 0.05
-            ), f"p_00: archbox={trans[0, 0]:.4f}, R={r_params['p_00']:.4f}"
+            assert abs(trans[0, 0] - r_params["p_00"]) < tol_pct * r_params["p_00"] + 0.05, (
+                f"p_00: archbox={trans[0, 0]:.4f}, R={r_params['p_00']:.4f}"
+            )
         if "p_11" in r_params:
-            assert (
-                abs(trans[1, 1] - r_params["p_11"]) < tol_pct * r_params["p_11"] + 0.05
-            ), f"p_11: archbox={trans[1, 1]:.4f}, R={r_params['p_11']:.4f}"
+            assert abs(trans[1, 1] - r_params["p_11"]) < tol_pct * r_params["p_11"] + 0.05, (
+                f"p_11: archbox={trans[1, 1]:.4f}, R={r_params['p_11']:.4f}"
+            )
 
         # Regime means should be ordered (regime 0 = expansion, regime 1 = recession)
         if hasattr(results, "regime_params") and results.regime_params:

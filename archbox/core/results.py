@@ -73,7 +73,7 @@ class ArchResults:
         n = self.nobs
         self.aic = -2.0 * loglike + 2.0 * k
         self.bic = -2.0 * loglike + k * np.log(n)
-        self.hqic = -2.0 * loglike + 3.0 * k * np.log(np.log(n))
+        self.hqic = -2.0 * loglike + 2.0 * k * np.log(np.log(n))
 
     def persistence(self) -> float:
         """Compute persistence: sum(alpha_i) + sum(beta_j).
@@ -219,7 +219,7 @@ class ArchResults:
         import matplotlib.pyplot as plt
 
         if which == "volatility":
-            fig, axes = plt.subplots(2, 1, figsize=(12, 8), sharex=True)
+            fig, axes = plt.subplots(2, 1, figsize=(13, 8), sharex=True)
             ax1, ax2 = axes
 
             ax1.plot(self._model.endog, color="steelblue", alpha=0.7, linewidth=0.5)

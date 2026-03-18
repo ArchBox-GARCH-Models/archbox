@@ -25,9 +25,9 @@ class TestGOGARCH:
 
         for i in range(k):
             for j in range(i + 1, k):
-                assert (
-                    abs(corr[i, j]) < 0.3
-                ), f"Factor correlation ({i},{j}) = {corr[i, j]:.3f}, expected ~0"
+                assert abs(corr[i, j]) < 0.3, (
+                    f"Factor correlation ({i},{j}) = {corr[i, j]:.3f}, expected ~0"
+                )
 
     def test_gogarch_reconstruction(self, synthetic_returns):
         """H_t = Z * diag(h_t) * Z' should reconstruct correctly."""

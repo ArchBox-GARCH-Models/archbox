@@ -111,9 +111,9 @@ class TestMarkovSwitchingMean:
 
         sigma_0 = results.regime_params[0]["sigma"]
         sigma_1 = results.regime_params[1]["sigma"]
-        assert (
-            abs(sigma_0 - sigma_1) < 1e-10
-        ), f"MS-Mean should have constant sigma: {sigma_0} vs {sigma_1}"
+        assert abs(sigma_0 - sigma_1) < 1e-10, (
+            f"MS-Mean should have constant sigma: {sigma_0} vs {sigma_1}"
+        )
 
     def test_model_name(self):
         """Model name should be MS-Mean."""
@@ -152,9 +152,9 @@ class TestMarkovSwitchingMeanVar:
         estimated_sigmas = sorted([results.regime_params[s]["sigma"] for s in range(2)])
 
         # The smaller sigma should be clearly smaller
-        assert (
-            estimated_sigmas[0] < estimated_sigmas[1]
-        ), "MS-Mean-Var should detect different regime variances"
+        assert estimated_sigmas[0] < estimated_sigmas[1], (
+            "MS-Mean-Var should detect different regime variances"
+        )
 
     def test_recover_true_regimes(self, simulated_ms_meanvar_data):
         """Smoothed probabilities should detect regimes."""

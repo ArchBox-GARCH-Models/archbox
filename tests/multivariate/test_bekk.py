@@ -62,12 +62,12 @@ class TestBEKKGARCH:
         # Diagonal: k(k+1)/2 + 2*k
         expected_diag = k * (k + 1) // 2 + 2 * k
 
-        assert (
-            full_model.num_params == expected_full
-        ), f"Full BEKK k={k}: expected {expected_full}, got {full_model.num_params}"
-        assert (
-            diag_model.num_params == expected_diag
-        ), f"Diag BEKK k={k}: expected {expected_diag}, got {diag_model.num_params}"
+        assert full_model.num_params == expected_full, (
+            f"Full BEKK k={k}: expected {expected_full}, got {full_model.num_params}"
+        )
+        assert diag_model.num_params == expected_diag, (
+            f"Diag BEKK k={k}: expected {expected_diag}, got {diag_model.num_params}"
+        )
         assert diag_model.num_params < full_model.num_params
 
     def test_bekk_full_params_count(self):
@@ -75,18 +75,18 @@ class TestBEKKGARCH:
         for k, expected in [(2, 11), (3, 24), (5, 65)]:
             returns = np.random.randn(100, k) * 0.01
             model = BEKK(returns, variant="full")
-            assert (
-                model.num_params == expected
-            ), f"Full BEKK k={k}: expected {expected}, got {model.num_params}"
+            assert model.num_params == expected, (
+                f"Full BEKK k={k}: expected {expected}, got {model.num_params}"
+            )
 
     def test_bekk_diagonal_params_count(self):
         """Check diagonal parameter counts for various k."""
         for k, expected in [(2, 7), (3, 12), (5, 25)]:
             returns = np.random.randn(100, k) * 0.01
             model = BEKK(returns, variant="diagonal")
-            assert (
-                model.num_params == expected
-            ), f"Diag BEKK k={k}: expected {expected}, got {model.num_params}"
+            assert model.num_params == expected, (
+                f"Diag BEKK k={k}: expected {expected}, got {model.num_params}"
+            )
 
     def test_bekk_loglike_finite(self, bekk_returns):
         """Log-likelihood should be finite."""

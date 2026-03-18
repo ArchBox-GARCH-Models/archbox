@@ -125,9 +125,9 @@ class TestEWMAMultivariate:
         # Check positive definiteness of all covariance matrices
         for t in range(n):
             eigenvalues = np.linalg.eigvalsh(H[t])
-            assert np.all(
-                eigenvalues > -1e-10
-            ), f"H[{t}] is not positive semi-definite: eigenvalues={eigenvalues}"
+            assert np.all(eigenvalues > -1e-10), (
+                f"H[{t}] is not positive semi-definite: eigenvalues={eigenvalues}"
+            )
 
     def test_ewma_multivariate_symmetry(self, rng: np.random.Generator) -> None:
         n = 200

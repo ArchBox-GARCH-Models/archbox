@@ -54,9 +54,9 @@ class SimpleMSMean(MarkovSwitchingModel):
 
 
 @pytest.fixture
-def simulated_two_regime_data() -> (
-    tuple[np.ndarray, np.ndarray, np.ndarray, list[float], list[float]]
-):
+def simulated_two_regime_data() -> tuple[
+    np.ndarray, np.ndarray, np.ndarray, list[float], list[float]
+]:
     """Generate two-regime data with clear separation."""
     rng = np.random.default_rng(42)
     t_obs = 500
@@ -141,9 +141,9 @@ class TestEMConvergence:
 
         # Allow tolerance for mean estimation
         for est, true in zip(estimated_means, true_means, strict=True):
-            assert (
-                abs(est - true) < abs(true) * 0.5 + 0.5
-            ), f"Mean estimation off: estimated={est:.3f}, true={true:.3f}"
+            assert abs(est - true) < abs(true) * 0.5 + 0.5, (
+                f"Mean estimation off: estimated={est:.3f}, true={true:.3f}"
+            )
 
 
 class TestEMTransitionMatrix:

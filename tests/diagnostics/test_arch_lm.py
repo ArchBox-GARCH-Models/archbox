@@ -30,9 +30,9 @@ class TestArchLMRejectsARCH:
 
         assert isinstance(result, TestResult)
         assert result.test_name == "ARCH-LM"
-        assert (
-            result.pvalue < 0.05
-        ), f"ARCH-LM should reject for ARCH process, p={result.pvalue:.4f}"
+        assert result.pvalue < 0.05, (
+            f"ARCH-LM should reject for ARCH process, p={result.pvalue:.4f}"
+        )
 
 
 class TestArchLMAcceptsIID:
@@ -42,9 +42,9 @@ class TestArchLMAcceptsIID:
         e = rng.standard_normal(2000)
         result = arch_lm_test(e, lags=5)
 
-        assert (
-            result.pvalue > 0.05
-        ), f"ARCH-LM should not reject for iid N(0,1), p={result.pvalue:.4f}"
+        assert result.pvalue > 0.05, (
+            f"ARCH-LM should not reject for iid N(0,1), p={result.pvalue:.4f}"
+        )
 
 
 class TestArchLMAfterGARCH:
@@ -70,9 +70,9 @@ class TestArchLMAfterGARCH:
 
         result = arch_lm_test(std_resids, lags=5)
 
-        assert (
-            result.pvalue > 0.05
-        ), f"ARCH-LM should not reject for GARCH standardized residuals, p={result.pvalue:.4f}"
+        assert result.pvalue > 0.05, (
+            f"ARCH-LM should not reject for GARCH standardized residuals, p={result.pvalue:.4f}"
+        )
 
 
 class TestArchLMEdgeCases:

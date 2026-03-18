@@ -47,9 +47,9 @@ class TestEngleSheppardAcceptsCCC:
 
         result = engle_sheppard_test(z, lags=1)
 
-        assert (
-            result.pvalue > 0.05
-        ), f"Should not reject CCC for constant correlation, p={result.pvalue:.4f}"
+        assert result.pvalue > 0.05, (
+            f"Should not reject CCC for constant correlation, p={result.pvalue:.4f}"
+        )
 
 
 class TestEngleSheppardEdgeCases:

@@ -219,7 +219,7 @@ class ArchResults:
         import matplotlib.pyplot as plt
 
         if which == "volatility":
-            fig, axes = plt.subplots(2, 1, figsize=(12, 8), sharex=True)
+            fig, axes = plt.subplots(2, 1, figsize=(13, 8), sharex=True)
             ax1, ax2 = axes
 
             ax1.plot(self._model.endog, color="steelblue", alpha=0.7, linewidth=0.5)

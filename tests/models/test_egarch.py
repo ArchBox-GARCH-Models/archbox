@@ -39,9 +39,9 @@ class TestEGARCH:
         model = EGARCH(sp500_returns, p=1, q=1)
         results = model.fit(disp=False)
         gamma_idx = 2  # omega, alpha, gamma, beta
-        assert (
-            results.params[gamma_idx] < 0
-        ), f"EGARCH gamma should be < 0 for SP500, got {results.params[gamma_idx]}"
+        assert results.params[gamma_idx] < 0, (
+            f"EGARCH gamma should be < 0 for SP500, got {results.params[gamma_idx]}"
+        )
 
     def test_egarch_no_positivity_constraint(self, sp500_returns: np.ndarray):
         """EGARCH should accept negative omega and alpha (no positivity constraint)."""

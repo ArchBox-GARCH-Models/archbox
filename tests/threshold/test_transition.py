@@ -79,9 +79,9 @@ class TestExponentialTransition:
             for delta in [0.1, 0.5, 1.0, 3.0]:
                 G_minus = exponential_transition(np.array([c - delta]), gamma, c)
                 G_plus = exponential_transition(np.array([c + delta]), gamma, c)
-                assert (
-                    abs(G_minus[0] - G_plus[0]) < 1e-10
-                ), f"Not symmetric for gamma={gamma}, delta={delta}"
+                assert abs(G_minus[0] - G_plus[0]) < 1e-10, (
+                    f"Not symmetric for gamma={gamma}, delta={delta}"
+                )
 
     def test_exponential_at_center(self) -> None:
         """G(c; gamma, c) = 0 for exponential transition."""
