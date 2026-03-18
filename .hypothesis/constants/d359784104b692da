@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/archbox/multivariate/ccc.py
+# hypothesis_version: 6.151.9
+
+[-2.0, 2.0, 'CCC-GARCH', 'GARCH', 'correlation', 'covariance', 'two_step']

@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/archbox/visualization/export.py
+# hypothesis_version: 6.151.9
+
+[150, 'pdf', 'png', 'svg', 'tight']

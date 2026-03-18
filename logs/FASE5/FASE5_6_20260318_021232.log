@@ -1,0 +1,18 @@
+All done. Here's a summary of what was implemented:
+
+**Deliverables created:**
+
+1. **`archbox/threshold/tests_linearity.py`** - Four linearity tests:
+   - `linearity_test()` - Luukkonen-Saikkonen-Terasvirta (1988) LM test for linearity vs STAR
+   - `transition_type_test()` - Terasvirta (1994) LSTAR vs ESTAR selection
+   - `tsay_test()` - Tsay (1989) test for TAR nonlinearity
+   - `hansen_threshold_test()` - Hansen (1996) bootstrap sup-LM test
+
+2. **`archbox/threshold/__init__.py`** - Updated with all exports (models + tests + TestResult)
+
+3. **`tests/threshold/test_linearity.py`** - 15 tests covering all linearity tests + integration tests
+
+**Results:**
+- All 60 threshold tests pass (`pytest tests/threshold/ -v`)
+- `ruff check archbox/threshold/` passes with no errors
+- All 14 acceptance criteria checked off in FASE5_6.md

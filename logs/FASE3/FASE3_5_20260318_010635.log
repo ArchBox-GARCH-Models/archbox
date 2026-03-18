@@ -1,0 +1,17 @@
+F3.5 concluida. Resumo:
+
+**Arquivos criados:**
+1. `archbox/multivariate/gogarch.py` - GO-GARCH com ICA (FastICA) + GARCH univariados nos fatores
+2. `archbox/multivariate/deco.py` - DECO com dinamica DCC-like e equicorrelacao escalar rho_t
+3. `tests/multivariate/test_gogarch.py` - 9 testes
+4. `tests/multivariate/test_deco.py` - 12 testes
+
+**Arquivo atualizado:**
+5. `archbox/multivariate/__init__.py` - exporta GOGARCH e DECO
+
+**Resultados:**
+- 21/21 testes passando
+- `ruff check` sem erros
+- GO-GARCH: fatores independentes via ICA, H_t = Z * diag(h_t) * Z' positiva definida
+- DECO: R_t com equicorrelacao escalar, rho_t dinamico em (-1/(k-1), 1), escala para k=10
+- Todos os 13 criterios de aceite marcados como concluidos

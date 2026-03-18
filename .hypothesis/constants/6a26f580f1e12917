@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/archbox/threshold/lstar.py
+# hypothesis_version: 6.151.9
+
+[-0.5, 1e-12, 1e-06, 0.01, 0.15, 0.5, 0.85, 1.0, 500.0, 1000000000000000.0, 5000, 'LSTAR', 'Nelder-Mead', 'c', 'fatol', 'gamma', 'maxiter', 'regime_1', 'regime_2', 'xatol']

@@ -1,0 +1,16 @@
+F2.2 complete. Summary:
+
+**Delivered files:**
+1. `archbox/models/aparch.py` - APARCH model (Ding, Granger & Engle, 1993) with power parameter delta
+2. `archbox/models/igarch.py` - IGARCH model (Engle & Bollerslev, 1986) with unit persistence
+3. `tests/models/test_aparch.py` - 8 tests for APARCH
+4. `tests/models/test_igarch.py` - 8 tests for IGARCH
+5. Updated `archbox/models/__init__.py` with APARCH/IGARCH exports
+
+**Key implementation details:**
+- APARCH uses `backcast_delta = backcast^(delta/2)` initialization matching GARCH's `sigma2[0] = backcast` pattern
+- APARCH transform clips `exp()` inputs to `[-20, 20]` to prevent overflow during optimization
+- IGARCH sets `self.p = 1, self.q = 1` so the forecast method in ArchResults extracts parameters correctly
+- IGARCH enforces `beta = 1 - alpha` internally (only omega and alpha are free params)
+
+**Results:** 16/16 tests pass, `ruff check` clean, all 105 project tests pass.

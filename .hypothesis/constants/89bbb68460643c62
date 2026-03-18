@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/archbox/threshold/results.py
+# hypothesis_version: 6.151.9
+
+[-0.05, 0.1, 0.3, 0.5, 0.6, 0.8, 1.0, 1.05, '-', '--', '=', 'Fitted', 'G(s_t)', 'Observation index', 'Observed', 'Residual', 'Residuals', 'Time', 'Transition Values', 'Variance per Regime:', 'b-', 'blue', 'const', 'coolwarm', 'gray', 'k-', 'r-', 'red', 'y_t', 'y_{t-1}']

@@ -1,0 +1,13 @@
+F6.5 concluida. Resumo:
+
+**Arquivos criados (8):**
+- `archbox/diagnostics/__init__.py` — exports dos 3 testes
+- `archbox/diagnostics/arch_lm.py` — ARCH-LM test (Engle, 1982)
+- `archbox/diagnostics/sign_bias.py` — Sign Bias test (Engle & Ng, 1993)
+- `archbox/diagnostics/ljung_box.py` — Ljung-Box em residuos ao quadrado
+- `tests/diagnostics/__init__.py`
+- `tests/diagnostics/test_arch_lm.py` — 5 testes
+- `tests/diagnostics/test_sign_bias.py` — 4 testes
+- `tests/diagnostics/test_ljung_box.py` — 5 testes
+
+**Resultados:** 14/14 testes passando, ruff sem erros. Todos os 10 criterios de aceite marcados.

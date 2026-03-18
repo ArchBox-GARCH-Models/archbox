@@ -1,0 +1,11 @@
+Subfase F5.5 (ESTAR) concluida. Resumo:
+
+**Arquivos criados/editados:**
+1. `archbox/threshold/estar.py` — Modelo ESTAR com transicao exponencial simetrica
+2. `archbox/threshold/__init__.py` — Adicionado import e export de `ESTAR`
+3. `tests/threshold/test_estar.py` — 10 testes cobrindo todos os criterios
+
+**Resultados:**
+- 10/10 testes passando
+- `ruff check` sem erros
+- 11/11 criterios de aceite marcados como concluidos

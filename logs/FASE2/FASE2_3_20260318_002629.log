@@ -1,0 +1,16 @@
+Subfase F2.3 concluida. Resumo:
+
+**Arquivos criados:**
+1. `archbox/models/figarch.py` - FIGARCH(1,d,1) com diferenciacao fracional e memoria longa
+2. `archbox/models/garch_m.py` - GARCH-M com premio de risco na equacao da media
+3. `tests/models/test_figarch.py` - 10 testes para FIGARCH
+4. `tests/models/test_garch_m.py` - 11 testes para GARCH-M
+
+**Correcoes em relacao a especificacao:**
+- `_fractional_coefficients`: formula corrigida de `(k-1-d)/k` para `(k-d)/(k+1)` para produzir os coeficientes delta_k corretos da expansao `(1-L)^d`
+- `_compute_lambda_coefficients`: recursao corrigida usando `lambda_k = beta*lambda_{k-1} + delta_k - phi*delta_{k-1}`
+- GARCH-M `loglike`: implementacao com forward pass conjunto (sigma2 e residuos ajustados simultaneamente) em vez de 2 passes separados
+- `transform_params` no GARCH-M: adicionado `np.clip` no `exp()` para evitar overflow
+- Testes: corrigido `results.loglikelihood` -> `results.loglike` e `len(forecast)` -> `len(forecast["variance"])` para compatibilidade com `ArchResults`
+
+**Resultados:** 21/21 testes passando, `ruff check` sem erros, todos os 13 criterios de aceite marcados.

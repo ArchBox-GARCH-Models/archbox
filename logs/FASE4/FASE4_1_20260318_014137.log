@@ -1,0 +1,11 @@
+FASE4_1 complete. All 8 deliverables created and all 12 acceptance criteria verified:
+
+**Files created:**
+1. `archbox/regime/__init__.py` — Module init with exports
+2. `archbox/regime/base.py` — `MarkovSwitchingModel` ABC with abstract methods (`_regime_loglike`, `start_params`, `param_names`) and concrete methods (`fit`, `loglike`, `forecast`, `simulate`, `_extract_transition_matrix`, `_build_transition_matrix_from_diag`)
+3. `archbox/regime/results.py` — `RegimeResults` container with `summary()`, `expected_durations()`, `ergodic_probabilities()`, `classify()`, `plot_regimes()`, `plot_probabilities()`
+4. `archbox/datasets/data/macro/us_gdp_quarterly.csv` — 307 observations, calibrated synthetic GDP growth
+5. `archbox/datasets/data/macro/us_recession_dates.csv` — 12 NBER recession periods
+6. `archbox/datasets/load.py` — Updated with `us_gdp_quarterly` and `us_recession_dates`
+7. `tests/regime/__init__.py` — Empty init
+8. `tests/regime/test_base.py` — 11 tests, all passing

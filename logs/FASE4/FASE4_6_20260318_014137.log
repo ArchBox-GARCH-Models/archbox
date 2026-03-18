@@ -1,0 +1,11 @@
+Subfase F4.6 completa. Resumo:
+
+**Entregaveis criados:**
+1. `archbox/regime/ms_ar.py` — `MarkovSwitchingAR` (Hamilton 1989) com suporte a `switching_mean`, `switching_variance`, `switching_ar`, M-step customizado com WLS, e parametrizacao flexivel
+2. `archbox/regime/__init__.py` — Atualizado com export de `MarkovSwitchingAR`
+3. `tests/regime/test_ms_ar.py` — 11 testes cobrindo GDP, dados simulados e edge cases
+
+**Resultados:**
+- 11/11 testes passando (0.18s)
+- `ruff check` sem erros
+- 13/13 criterios de aceite marcados como concluidos

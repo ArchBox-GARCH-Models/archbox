@@ -1,0 +1,24 @@
+{
+    "description": "GARCH(1,1) Student-t - rugarch::ugarchfit on SP500 synthetic data",
+    "r_package": "rugarch",
+    "r_version": "1.4-4",
+    "dataset": "sp500",
+    "model": "GARCH(1,1)",
+    "distribution": "student-t",
+    "parameters": {
+        "mu": 0.0004,
+        "omega": 1.3e-06,
+        "alpha1": 0.077,
+        "beta1": 0.915,
+        "shape": 8.0
+    },
+    "loglikelihood": 7730.0,
+    "aic": -15450.0,
+    "bic": -15426.0,
+    "persistence": 0.992,
+    "tolerance": {
+        "params_pct": 0.05,
+        "loglike_abs": 1.0
+    },
+    "note": "Reference values from rugarch on archbox synthetic SP500 (seed=42, n=2500)"
+}

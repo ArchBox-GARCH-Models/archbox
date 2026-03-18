@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/archbox/report/transformers/regime.py
+# hypothesis_version: 6.151.9
+
+[1.0, 'Markov-Switching', 'aic', 'bic', 'counts', 'duration', 'expected_durations', 'inf', 'loglikelihood', 'model_name', 'n_obs', 'n_regimes', 'nobs', 'params', 'proportions', 'regime', 'regime_params', 'smoothed_probs', 'transition_matrix', 'value']

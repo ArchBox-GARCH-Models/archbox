@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/archbox/utils/news_impact.py
+# hypothesis_version: 6.151.9
+
+[0.3, 0.5, 3.0, 100, '$\\sigma^2_t$', '$\\varepsilon_{t-1}$', '--', 'Model', 'gray']

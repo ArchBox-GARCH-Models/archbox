@@ -1,0 +1,11 @@
+Subfase F1.5 concluida. Resumo:
+
+**Arquivos criados/editados:**
+1. `archbox/estimation/mle.py` — `MLEstimator` com `fit()`, `_fit_standard()`, `_fit_with_targeting()`, `_compute_standard_errors()`, `_compute_hessian()`, `_compute_opg()`
+2. `archbox/estimation/__init__.py` — Exporta `MLEstimator`
+3. `tests/estimation/test_mle.py` — 6 testes cobrindo convergencia, parametros, SEs, loglike, variance targeting, e shape do sigma2
+
+**Resultados:**
+- 6/6 testes passando
+- `ruff check` sem erros
+- Todos os 10 criterios de aceite marcados como concluidos

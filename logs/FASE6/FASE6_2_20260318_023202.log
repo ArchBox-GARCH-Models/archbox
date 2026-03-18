@@ -1,0 +1,7 @@
+Subfase F6.2 concluida. Resumo dos entregaveis:
+
+1. **`archbox/risk/es.py`** - Classe `ExpectedShortfall` com 4 metodos: `parametric` (Normal/Student-t), `historical` (rolling window), `filtered_historical` (FHS)
+2. **`archbox/risk/__init__.py`** - Atualizado com export de `ExpectedShortfall`
+3. **`tests/risk/test_es.py`** - 9 testes cobrindo formulas analiticas, comparacao ES <= VaR, historico, FHS e edge cases
+
+Todos os 9 testes passaram e `ruff check` esta limpo. Todos os 9 criterios de aceite foram marcados como concluidos no arquivo de especificacao.

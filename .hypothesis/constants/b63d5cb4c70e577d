@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/archbox/report/exporters/latex.py
+# hypothesis_version: 6.151.9
+
+[' & ', ' \\\\', '0.9\\textwidth', '\\begin{figure}[htbp]', '\\begin{table}[htbp]', '\\bottomrule', '\\centering', '\\end{figure}', '\\end{table}', '\\end{tabular}', '\\midrule', '\\toprule', 'l', 'r', 'utf-8']

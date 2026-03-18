@@ -1,0 +1,12 @@
+Subfase F6.7 concluida. Resumo:
+
+**Arquivos criados/editados:**
+1. `archbox/diagnostics/diagnostics.py` — `DiagnosticReport` dataclass + `full_diagnostics()` que executa ARCH-LM, Sign Bias, Ljung-Box z^2, Nyblom e Jarque-Bera em uma unica chamada, com `summary()` gerando tabela formatada
+2. `archbox/diagnostics/__init__.py` — adicionados exports de `full_diagnostics` e `DiagnosticReport`
+3. `archbox/risk/__init__.py` — ja estava correto (exporta ValueAtRisk, ExpectedShortfall, EWMA, VaRBacktest)
+4. `tests/diagnostics/test_diagnostics.py` — 10 testes incluindo integracao end-to-end (data -> VaR -> ES -> backtest -> EWMA -> diagnostics)
+
+**Resultados:**
+- 74/74 testes passam (`tests/risk/` + `tests/diagnostics/`)
+- `ruff check` sem erros
+- Todos os 12 criterios de aceite marcados como concluidos

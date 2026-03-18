@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/archbox/threshold/__init__.py
+# hypothesis_version: 6.151.9
+
+['ESTAR', 'LSTAR', 'SETAR', 'TAR', 'TestResult', 'ThresholdModel', 'ThresholdResults', 'linearity_test', 'logistic_transition', 'plot_transition', 'transition_type_test', 'tsay_test']

@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+
+{% block sidebar %}
+<li><a href="#summary">Summary</a></li>
+<li><a href="#parameters">Parameters</a></li>
+<li><a href="#info-criteria">Information Criteria</a></li>
+<li><a href="#volatility">Volatility</a></li>
+<li><a href="#diagnostics">Diagnostics</a></li>
+<li><a href="#residuals">Residuals</a></li>
+{% endblock %}
+
+{% block content %}
+<!-- Summary -->
+<h2 id="summary">Model Summary</h2>
+<div class="metric-grid">
+    {% if persistence is not none %}
+    <div class="metric-card">
+        <div class="metric-value">{{ persistence | fmt_number(4) }}</div>
+        <div class="metric-label">Persistence</div>
+    </div>
+    {% endif %}
+    {% if half_life is not none %}
+    <div class="metric-card">
+        <div class="metric-value">{{ half_life | fmt_number(1) }}</div>
+        <div class="metric-label">Half-Life (obs)</div>
+    </div>
+    {% endif %}
+    {% if unconditional_variance is not none %}
+    <div class="metric-card">
+        <div class="metric-value">{{ unconditional_variance | fmt_number(6) }}</div>
+        <div class="metric-label">Unconditional Variance</div>
+    </div>
+    {% endif %}
+    {% if loglikelihood is not none %}
+    <div class="metric-card">
+        <div class="metric-value">{{ loglikelihood | fmt_number(2) }}</div>
+        <div class="metric-label">Log-Likelihood</div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Parameters Table -->
+<h2 id="parameters">Parameter Estimates</h2>
+<div class="card">
+    <table>
+        <thead>
+            <tr>
+                <th>Parameter</th>
+                <th>Estimate</th>
+                <th>Std. Error</th>
+                <th>t-Statistic</th>
+                <th>p-Value</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in params_table %}
+            <tr>
+                <td>{{ row.name }}</td>
+                <td class="numeric">{{ row.value | fmt_number(6) }}</td>
+                <td class="numeric">{{ row.std_error | fmt_number(6) if row.std_error is defined else '-' }}</td>
+                <td class="numeric">{{ row.t_stat | fmt_number(3) if row.t_stat is defined else '-' }}</td>
+                <td class="numeric">{{ row.p_value | fmt_pvalue if row.p_value is defined else '-' }}</td>
+                <td class="significance">{{ row.significance if row.significance is defined else '' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Information Criteria -->
+<h2 id="info-criteria">Information Criteria</h2>
+<div class="card">
+    <table>
+        <thead>
+            <tr>
+                <th>Criterion</th>
+                <th>Value</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if loglikelihood is not none %}
+            <tr><td>Log-Likelihood</td><td class="numeric">{{ loglikelihood | fmt_number(2) }}</td></tr>
+            {% endif %}
+            {% if aic is not none %}
+            <tr><td>AIC</td><td class="numeric">{{ aic | fmt_number(2) }}</td></tr>
+            {% endif %}
+            {% if bic is not none %}
+            <tr><td>BIC</td><td class="numeric">{{ bic | fmt_number(2) }}</td></tr>
+            {% endif %}
+            {% if hqic is not none %}
+            <tr><td>HQIC</td><td class="numeric">{{ hqic | fmt_number(2) }}</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Volatility Statistics -->
+<h2 id="volatility">Conditional Volatility</h2>
+{% if volatility_stats is defined %}
+<div class="card">
+    <div class="metric-grid">
+        <div class="metric-card">
+            <div class="metric-value">{{ volatility_stats.annualized_mean | fmt_percent }}</div>
+            <div class="metric-label">Annualized Mean Vol</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">{{ volatility_stats.min | fmt_number(6) }}</div>
+            <div class="metric-label">Min Daily Vol</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">{{ volatility_stats.max | fmt_number(6) }}</div>
+            <div class="metric-label">Max Daily Vol</div>
+        </div>
+    </div>
+</div>
+{% endif %}
+<div class="chart-container" id="volatility-chart"></div>
+
+<!-- Diagnostics -->
+<h2 id="diagnostics">Model Diagnostics</h2>
+{% if diagnostics is defined %}
+<div class="card">
+    <div class="collapsible-header active">Diagnostic Tests</div>
+    <div class="collapsible-content active">
+        <table>
+            <thead>
+                <tr>
+                    <th>Test</th>
+                    <th>Statistic</th>
+                    <th>p-Value</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if diagnostics.arch_lm is defined %}
+                <tr>
+                    <td>ARCH-LM</td>
+                    <td class="numeric">{{ diagnostics.arch_lm.stat | fmt_number(3) }}</td>
+                    <td class="numeric">{{ diagnostics.arch_lm.pvalue | fmt_pvalue }}</td>
+                </tr>
+                {% endif %}
+                {% if diagnostics.ljung_box_z2 is defined %}
+                <tr>
+                    <td>Ljung-Box (z&sup2;)</td>
+                    <td class="numeric">{{ diagnostics.ljung_box_z2.stat | fmt_number(3) }}</td>
+                    <td class="numeric">{{ diagnostics.ljung_box_z2.pvalue | fmt_pvalue }}</td>
+                </tr>
+                {% endif %}
+                {% if diagnostics.sign_bias is defined %}
+                <tr>
+                    <td>Sign Bias</td>
+                    <td class="numeric">{{ diagnostics.sign_bias.stat | fmt_number(3) }}</td>
+                    <td class="numeric">{{ diagnostics.sign_bias.pvalue | fmt_pvalue }}</td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- Residual Statistics -->
+<h2 id="residuals">Standardized Residuals</h2>
+{% if residual_stats is defined %}
+<div class="card">
+    <div class="metric-grid">
+        <div class="metric-card">
+            <div class="metric-value">{{ residual_stats.mean | fmt_number(4) }}</div>
+            <div class="metric-label">Mean</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">{{ residual_stats.std | fmt_number(4) }}</div>
+            <div class="metric-label">Std Dev</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">{{ residual_stats.skewness | fmt_number(4) }}</div>
+            <div class="metric-label">Skewness</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">{{ residual_stats.kurtosis | fmt_number(4) }}</div>
+            <div class="metric-label">Excess Kurtosis</div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

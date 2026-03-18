@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/archbox/threshold/tar.py
+# hypothesis_version: 6.151.9
+
+[-0.5, 0.0, 0.15, 0.85, 300, 'TAR', 'c', 'regime_1', 'regime_2']

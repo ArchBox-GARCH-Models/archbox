@@ -1,0 +1,17 @@
+F2.6 complete. Here's a summary:
+
+**Files created:**
+1. `archbox/distributions/ged.py` - GED (Generalized Error Distribution) with `ppf`/`cdf` support
+2. `archbox/distributions/mixture_normal.py` - Mixture Normal with unit variance constraint, `ppf`/`cdf` support
+3. `tests/distributions/test_ged.py` - 9 tests for GED
+4. `tests/distributions/test_mixture_normal.py` - 9 tests for MixtureNormal
+
+**Updated:**
+- `archbox/distributions/__init__.py` - exports `GeneralizedError` and `MixtureNormal`
+
+**Key adaptations from spec:**
+- Added `ppf()` and `cdf()` methods (required by the `Distribution` ABC but not in the spec code)
+- Added `_get_nu()` / `_get_p_sigma1()` helper methods (following the pattern from `StudentT`/`SkewedT`)
+- Fixed import ordering for ruff compliance
+
+**Results:** 18/18 tests pass, ruff check clean, all 12 acceptance criteria checked off.

@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/archbox/multivariate/base.py
+# hypothesis_version: 6.151.9
+
+[-10000000000.0, -2.0, -1.05, -0.5, 0.0, 1e-08, 1e-06, 0.5, 0.8, 0.999, 1.05, 2.0, 10000000000.0, 500, '-', '--', '=', 'Correlation', 'Covariance', 'GARCH', 'SLSQP', 'Time', 'Unknown', 'constant', 'correlation', 'covariance', 'disp', 'ftol', 'gray', 'maxiter', 'two_step']

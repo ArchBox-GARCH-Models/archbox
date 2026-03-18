@@ -1,0 +1,27 @@
+All done. Here's a summary:
+
+## Completed: F8.3 - Integration Tests
+
+**Files created:**
+- `tests/integration/__init__.py`
+- `tests/integration/test_garch_full.py` — 3 tests (end-to-end, normal dist, variance targeting)
+- `tests/integration/test_dcc_full.py` — 2 tests (end-to-end, different orders)
+- `tests/integration/test_regime_full.py` — 2 tests (end-to-end MS-AR, different order)
+- `tests/integration/test_risk_full.py` — 4 tests (all VaR methods, ES, all backtests, report)
+- `tests/integration/test_threshold_full.py` — 3 tests (SETAR, LSTAR, linearity test)
+
+**Results: 14/14 tests pass, ruff clean.**
+
+**Bugs fixed during integration testing** (the tests caught these):
+1. `archbox/report/transformers/garch.py` — `persistence` and `unconditional_variance` are methods on `ArchResults`, not properties. The transformer was using them as attributes, causing `TypeError`. Fixed to call them when callable.
+2. `archbox/risk/var.py` and `archbox/risk/es.py` — `ArchResults` has `resid` (singular) but `ValueAtRisk`/`ExpectedShortfall` only looked for `resids` (plural). Added fallback to check `resid` as well.
+
+**Adaptations from spec** (spec used placeholder APIs that didn't match actual code):
+- Dataset: `"us_gdp_quarterly"` with column `"growth"` (not `"us_gdp"`)
+- Class: `MarkovSwitchingAR` (not `MSAR`)
+- Module: `archbox.report.report_manager` (not `archbox.reporting.report_manager`)
+- Method: `basel_traffic_light()` (not `traffic_light()`)
+- Attribute: `loglike` (not `loglikelihood`), `persistence()` as method
+- Attribute: `dynamic_correlation` and `smoothed_probs` as attributes (not methods)
+- Method: `classify()` (not `classify_regimes()`)
+- Attribute: `regime_assignments` and `transition_values` (not methods)

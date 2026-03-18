@@ -1,0 +1,13 @@
+Subfase F7.7 concluida. Resumo:
+
+**Entregaveis:**
+1. `archbox/__init__.py` — Simplificado para exportar apenas `__version__` (sem imports pesados de viz/report)
+2. `archbox/visualization/__init__.py` — Versao final com docstring Usage e todos os 16 exports organizados por categoria
+3. `archbox/report/__init__.py` — Versao final com docstring Usage e export do ReportManager
+4. `tests/report/test_integration.py` — 29 testes end-to-end cobrindo todos os report types x formatos
+
+**Resultados:**
+- 133 testes passam (visualization + report)
+- ruff check sem erros
+- Imports `from archbox.visualization import ...` e `from archbox.report import ReportManager` funcionam
+- Todos os 11 criterios de aceite marcados como concluidos

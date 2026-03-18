@@ -1,0 +1,14 @@
+Subfase F7.6 concluida. Resumo:
+
+**Arquivos criados (18):**
+- `archbox/report/exporters/__init__.py`, `html.py`, `latex.py`, `markdown.py` - 3 exporters
+- `archbox/report/templates/base.html` - template base com sidebar, footer, collapsible sections
+- 4 HTML templates: `garch_report.html`, `multivar_report.html`, `regime_report.html`, `risk_report.html` (todos estendem `base.html`)
+- 4 LaTeX templates: `garch_report.tex`, `multivar_report.tex`, `regime_report.tex`, `risk_report.tex` (com booktabs)
+- 4 Markdown templates: `garch_report.md`, `multivar_report.md`, `regime_report.md`, `risk_report.md` (GitHub-compatible)
+- `tests/report/test_exporters.py` - 12 testes
+
+**Verificacoes:**
+- 37/37 testes passam (`pytest tests/report/ -v`)
+- `ruff check archbox/report/` sem erros
+- Todos os 11 criterios de aceite marcados como `[x]`

@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/archbox/diagnostics/arch_lm.py
+# hypothesis_version: 6.151.9
+
+[0.0, 1e-20, 'ARCH-LM']

@@ -1,0 +1,19 @@
+Subfase F3.6 completa. Resumo do que foi feito:
+
+**Arquivos criados/modificados:**
+
+1. **`archbox/multivariate/portfolio.py`** (NOVO) — 7 funcoes de portfolio:
+   - `portfolio_variance` / `portfolio_volatility` — variancia/volatilidade do portfolio ao longo do tempo
+   - `minimum_variance_weights` / `minimum_variance_weights_dynamic` — pesos de minima variancia (estatico e dinamico)
+   - `marginal_risk_contribution` / `risk_contribution` / `risk_decomposition` — decomposicao de risco (Euler)
+
+2. **`archbox/multivariate/__init__.py`** (ATUALIZADO) — exporta todos os modelos + portfolio utilities
+
+3. **`archbox/__init__.py`** (ATUALIZADO) — exporta BEKK, CCC, DCC, DECO, GOGARCH no top-level
+
+4. **`tests/multivariate/test_portfolio.py`** (NOVO) — 16 testes: unitarios + integracao end-to-end com todos os modelos
+
+**Resultados:**
+- 84/84 testes passam em `tests/multivariate/`
+- `ruff check archbox/multivariate/` — sem erros
+- Todos os 12 criterios de aceite marcados como completos

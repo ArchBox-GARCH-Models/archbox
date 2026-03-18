@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/archbox/experiment/experiment.py
+# hypothesis_version: 6.151.9
+
+[0.05, 500, 'APARCH', 'COMPONENT', 'EGARCH', 'FIGARCH', 'GARCH', 'GARCH-M', 'GJR', 'IGARCH', '__len__', 'aic', 'bic', 'constant', 'dist', 'filtered-hs', 'garch', 'historical', 'html', 'loglike', 'mean', 'monte-carlo', 'normal', 'p', 'parametric', 'persistence', 'professional', 'q', 'variance']

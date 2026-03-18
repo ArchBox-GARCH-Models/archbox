@@ -1,0 +1,18 @@
+All done. Here's a summary of what was implemented:
+
+**Entregaveis:**
+
+1. `archbox/multivariate/dcc.py` - DCC-GARCH model with:
+   - `_correlation_recursion()`: Q_t recursion with normalization to R_t
+   - `_estimate_correlation()`: MLE with SLSQP optimizer and 5 starting points for robustness
+   - `forecast()`: Q_{T+h} convergence to Q_bar formula
+   - All variable names lowercase for ruff compliance
+
+2. `archbox/multivariate/__init__.py` - Updated with DCC export
+
+3. `tests/multivariate/test_dcc.py` - 13 tests covering all acceptance criteria
+
+**Results:**
+- 13/13 tests pass
+- `ruff check` clean (0 errors)
+- All 13 acceptance criteria checked off in the spec file

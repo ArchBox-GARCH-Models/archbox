@@ -1,0 +1,14 @@
+FASE5_1 implementada com sucesso. Resumo:
+
+**Arquivos criados:**
+1. `archbox/threshold/__init__.py` — Modulo raiz com exports
+2. `archbox/threshold/base.py` — `ThresholdModel` ABC com metodos abstratos e concretos
+3. `archbox/threshold/results.py` — `ThresholdResults` dataclass + `TestResult`
+4. `archbox/threshold/transition.py` — `logistic_transition`, `exponential_transition`, `logistic_transition_order2`, `plot_transition`
+5. `tests/threshold/__init__.py` — Init de testes
+6. `tests/threshold/test_transition.py` — 11 testes
+
+**Resultados:**
+- 11/11 testes passando
+- `ruff check archbox/threshold/` — All checks passed
+- Todos os 11 criterios de aceite marcados como concluidos

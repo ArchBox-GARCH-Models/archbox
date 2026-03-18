@@ -1,0 +1,20 @@
+Subfase F6.6 concluida. Resumo:
+
+**Arquivos criados:**
+1. `archbox/diagnostics/nyblom.py` — Nyblom (1989) parameter stability test
+2. `archbox/diagnostics/engle_sheppard.py` — Engle-Sheppard (2001) CCC vs DCC test
+3. `archbox/diagnostics/hong_spillover.py` — Hong (2001) volatility spillover test
+4. `tests/diagnostics/test_nyblom.py` — 6 testes
+5. `tests/diagnostics/test_engle_sheppard.py` — 5 testes
+6. `tests/diagnostics/test_hong_spillover.py` — 4 testes
+
+**Arquivo atualizado:**
+- `archbox/diagnostics/__init__.py` — exports dos 3 novos testes
+
+**Correcoes aplicadas durante implementacao:**
+- Normalizacao do Nyblom: corrigida de `1/T` para `1/T^2` para convergencia correta sob H0
+- Teste de estabilidade do Nyblom: scores demeaned para satisfazer a condicao de primeira ordem do MLE
+- Hong bandwidth: correcao do valor esperado `floor(1000^(1/3)) = 9`, nao 10
+- Variaveis renomeadas para lowercase (ruff N806)
+
+**Resultados:** 29 testes passando, ruff limpo.

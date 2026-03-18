@@ -1,0 +1,24 @@
+F3.1 is complete. Here's a summary of everything delivered:
+
+## Entregaveis criados
+
+| # | Arquivo | Status |
+|---|---------|--------|
+| 1 | `archbox/multivariate/__init__.py` | Criado |
+| 2 | `archbox/multivariate/base.py` | Criado (ABC + MultivarResults) |
+| 3 | `archbox/multivariate/results.py` | Criado (re-export) |
+| 4 | `archbox/multivariate/utils.py` | Criado (ensure_positive_definite, cov_to_corr, etc.) |
+| 5 | `archbox/datasets/data/financial/fx_majors.csv` | Gerado (2000 obs, 3 pares FX) |
+| 6 | `archbox/datasets/data/financial/sector_indices.csv` | Gerado (2000 obs, 5 setores) |
+| 7 | `archbox/datasets/load.py` | Atualizado com fx_majors e sector_indices |
+| 8 | `tests/multivariate/__init__.py` | Criado |
+| 9 | `tests/multivariate/conftest.py` | Criado (fixtures) |
+| 10 | `tests/multivariate/test_base.py` | Criado (11 testes) |
+
+## Criterios de aceite - todos marcados [x]
+
+- 11/11 testes passando
+- `ruff check archbox/multivariate/` sem erros
+- ABC nao instanciavel, validacoes funcionando, datasets carregando, utils verificados
+
+**Nota**: Os testes de validacao precisaram de um ajuste - `__new__` em ABCs com metodos abstratos levanta `TypeError` no Python 3.12+, entao criei uma subclasse concreta minima (`_ConcreteMultivar`) para testar as validacoes do `__init__`.

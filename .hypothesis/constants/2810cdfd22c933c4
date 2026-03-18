@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/archbox/risk/backtest.py
+# hypothesis_version: 6.151.9
+
+[0.0, 1e-10, 0.05, 1.0, 250, '-', '=', 'Christoffersen CC', 'Kupiec POF', 'Statistical Tests', 'VaR Backtest Summary', 'green', 'red', 'yellow']

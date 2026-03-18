@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/archbox/threshold/tests_linearity.py
+# hypothesis_version: 6.151.9
+
+[-1.0, 0.0, 0.15, 0.85, 1.0, 200, 1000, 'ESTAR', 'F2', 'F3', 'F4', 'LSTAR', 'Tsay', 'detail', 'p2', 'p3', 'p4', 'recommended']

@@ -1,0 +1,49 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage[margin=2.5cm]{geometry}
+
+\title{ {{ title | default('Multivariate GARCH Report') }} }
+\author{archbox}
+\date{ {{ generated_at | default('') }} }
+
+\begin{document}
+\maketitle
+
+\section{Model Summary}
+Model: {{ model_name | default('DCC-GARCH') }}, Series: {{ n_series | default(0) }}, Observations: {{ n_obs | default(0) }}
+
+{% if correlation_params is defined %}
+\section{Correlation Parameters}
+\begin{table}[htbp]
+\centering
+\begin{tabular}{lr}
+\toprule
+Parameter & Value \\
+\midrule
+{% for key, value in correlation_params.items() %}
+{{ key }} & {{ value | fmt_number(6) }} \\
+{% endfor %}
+\bottomrule
+\end{tabular}
+\end{table}
+{% endif %}
+
+{% if correlation_summary is defined %}
+\section{Dynamic Correlations}
+\begin{table}[htbp]
+\centering
+\begin{tabular}{lrrrr}
+\toprule
+Pair & Mean & Std Dev & Min & Max \\
+\midrule
+{% for pair in correlation_summary %}
+{{ pair.pair }} & {{ pair.mean | fmt_number(4) }} & {{ pair.std | fmt_number(4) }} & {{ pair.min | fmt_number(4) }} & {{ pair.max | fmt_number(4) }} \\
+{% endfor %}
+\bottomrule
+\end{tabular}
+\end{table}
+{% endif %}
+
+\end{document}

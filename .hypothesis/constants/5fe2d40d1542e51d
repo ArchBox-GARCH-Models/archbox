@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/archbox/models/har_rv.py
+# hypothesis_version: 6.151.9
+
+[1.0, '-', '=', 'beta_0', 'daily', 'monthly', 'ols', 'weekly']

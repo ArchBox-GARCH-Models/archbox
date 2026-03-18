@@ -1,0 +1,22 @@
+{
+    "description": "EGARCH(1,1) Normal - rugarch::ugarchfit on SP500 synthetic data",
+    "r_package": "rugarch",
+    "r_version": "1.4-4",
+    "dataset": "sp500",
+    "model": "EGARCH(1,1)",
+    "distribution": "normal",
+    "parameters": {
+        "mu": 0.0004,
+        "omega": -0.113,
+        "alpha1": 0.151,
+        "gamma1": -0.005,
+        "beta1": 0.987
+    },
+    "loglikelihood": 7724.9,
+    "persistence": 0.987,
+    "tolerance": {
+        "params_pct": 0.05,
+        "loglike_abs": 1.0
+    },
+    "note": "Reference values from rugarch EGARCH on archbox synthetic SP500"
+}

@@ -1,0 +1,17 @@
+FASE7_5 concluida. Resumo:
+
+**Arquivos criados (12):**
+- `archbox/report/__init__.py` - Modulo de reports
+- `archbox/report/report_manager.py` - Orquestrador (pipeline results -> transformer -> template -> export)
+- `archbox/report/template_manager.py` - Jinja2 com filtros customizados (fmt_number, fmt_pvalue, fmt_percent, significance_stars)
+- `archbox/report/css_manager.py` - CSS 3 camadas (base, component, theme) com 4 temas
+- `archbox/report/transformers/__init__.py` - Init transformers
+- `archbox/report/transformers/garch.py` - GARCHTransformer (params, persistence, half-life, diagnostics, volatility/residual stats)
+- `archbox/report/transformers/multivariate.py` - MultivariateTransformer (DCC params, correlation summary, per-series)
+- `archbox/report/transformers/regime.py` - RegimeTransformer (transition matrix, expected durations, regime classification)
+- `archbox/report/transformers/risk.py` - RiskTransformer (VaR/ES stats, backtest, traffic light Basel)
+- `tests/report/__init__.py`
+- `tests/report/test_transformers.py` - 17 testes dos 4 transformers
+- `tests/report/test_template_manager.py` - 8 testes (TemplateManager + CSSManager)
+
+**Verificacoes:** 25/25 testes passam, ruff check sem erros. Todos os 11 criterios de aceite marcados.

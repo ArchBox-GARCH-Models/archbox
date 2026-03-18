@@ -1,0 +1,11 @@
+Subfase F4.5 concluida. Resumo:
+
+**Arquivos criados/editados:**
+1. `archbox/regime/ms_mean.py` — `MarkovSwitchingMean` + `MarkovSwitchingMeanVar`
+2. `archbox/regime/__init__.py` — Atualizado com novos exports
+3. `tests/regime/test_ms_mean.py` — 15 testes
+
+**Resultados:**
+- **15/15 testes passando** (0.83s)
+- **ruff check** sem erros
+- **Todos os 12 criterios de aceite** marcados como concluidos

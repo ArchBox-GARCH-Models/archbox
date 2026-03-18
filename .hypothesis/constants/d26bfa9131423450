@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/archbox/diagnostics/diagnostics.py
+# hypothesis_version: 6.151.9
+
+[1e-12, 0.05, '-', '=', 'Diagnostic Report', 'FAIL', 'PASS', 'endog', 'resids', 'scores']

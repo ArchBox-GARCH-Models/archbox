@@ -1,0 +1,12 @@
+Subfase F1.3 concluida. Resumo:
+
+**Arquivos criados/atualizados:**
+1. `archbox/distributions/base.py` — `Distribution` ABC com 8 metodos abstratos (`loglikelihood`, `ppf`, `cdf`, `simulate`, `num_params`, `param_names`, `start_params`, `bounds`)
+2. `archbox/distributions/normal.py` — `Normal` com log-verossimilhanca gaussiana, ppf/cdf via scipy, simulacao via `rng.standard_normal`
+3. `archbox/distributions/__init__.py` — Exports atualizados
+4. `tests/distributions/test_normal.py` — 13 testes
+
+**Resultados:**
+- 13/13 testes passando
+- `ruff check` sem erros
+- Todos os 9 criterios de aceite verificados e marcados

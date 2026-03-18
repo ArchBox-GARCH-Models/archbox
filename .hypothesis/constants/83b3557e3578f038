@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/archbox/cli/main.py
+# hypothesis_version: 6.151.9
+
+[0.05, 250, '--alpha', '--column', '--data', '--dist', '--k-regimes', '--mean', '--method', '--model', '--order', '--output', '--p', '--q', '--var-method', '--variance-targeting', '--version', '--window', 'AR order', 'ARCH lag order', 'Available commands', 'Backtest VaR model', 'Estimation method', 'GARCH lag order', 'Mean model', 'Model type', 'Number of regimes', 'Output file path', 'Regime model type', 'Rolling window size', 'Significance level', '__main__', 'aparch', 'archbox', 'backtest', 'backtest.json', 'command', 'component', 'constant', 'egarch', 'em', 'estimate', 'figarch', 'filtered-hs', 'garch', 'garch-m', 'ged', 'gjr', 'har-rv', 'historical', 'igarch', 'mle', 'monte-carlo', 'ms-ar', 'ms-garch', 'ms-mean', 'ms-var', 'normal', 'parametric', 'regime', 'regime.json', 'results.json', 'returns', 'risk', 'risk.json', 'skewed-t', 'store_true', 'student-t', 'zero']

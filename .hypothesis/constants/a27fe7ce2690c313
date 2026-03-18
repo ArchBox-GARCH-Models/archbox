@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/archbox/distributions/mixture_normal.py
+# hypothesis_version: 6.151.9
+
+[-50.0, -0.5, 1e-300, 1e-06, 0.01, 0.5, 0.99, 1.0, 5.0, 50.0, 'Mixture Normal', 'p', 'sigma1']

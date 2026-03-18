@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/archbox/models/garch.py
+# hypothesis_version: 6.151.9
+
+[-50.0, 0.0, 1e-12, 1e-10, 1e-08, 0.08, 0.88, 0.9999, 1.0, 10.0, 50.0, 'GARCH', 'constant', 'normal', 'omega', 'p', 'q']

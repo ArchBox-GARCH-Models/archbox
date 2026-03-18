@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/archbox/diagnostics/__init__.py
+# hypothesis_version: 6.151.9
+
+['DiagnosticReport', 'arch_lm_test', 'engle_sheppard_test', 'full_diagnostics', 'hong_spillover_test', 'ljung_box_squared', 'nyblom_test', 'sign_bias_test']

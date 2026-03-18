@@ -1,0 +1,11 @@
+Subfase F6.4 concluida. Resumo:
+
+**Arquivos criados/editados:**
+1. `archbox/risk/backtest.py` — `TestResult` dataclass + `VaRBacktest` com `kupiec_test()`, `christoffersen_test()`, `basel_traffic_light()`, `violation_ratio()`, `summary()`
+2. `archbox/risk/__init__.py` — adicionado export de `VaRBacktest`
+3. `tests/risk/test_backtest.py` — 10 testes cobrindo todos os criterios
+
+**Resultados:**
+- 10/10 testes passando
+- `ruff check archbox/risk/` sem erros
+- Todos os 10 criterios de aceite marcados como concluidos

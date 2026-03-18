@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/archbox/threshold/transition.py
+# hypothesis_version: 6.151.9
+
+[-500.0, -0.05, 0.0, 0.3, 0.5, 1.0, 1.05, 500.0, '--', 'G(s; gamma, c)', 'exponential', 'gray', 'logistic']

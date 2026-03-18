@@ -1,0 +1,11 @@
+Subfase F5.2 concluida. Resumo:
+
+**Entregaveis criados:**
+1. `archbox/threshold/tar.py` — Modelo TAR com grid search sobre threshold, OLS por regime, variancias diferentes
+2. `archbox/threshold/__init__.py` — Atualizado com import do TAR
+3. `tests/threshold/test_tar.py` — 8 testes cobrindo todos os criterios
+
+**Verificacoes:**
+- `pytest tests/threshold/test_tar.py -v` — 8/8 passed
+- `ruff check archbox/threshold/tar.py` — sem erros
+- Todos os 11 criterios de aceite marcados como concluidos

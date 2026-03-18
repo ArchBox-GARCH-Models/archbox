@@ -1,0 +1,11 @@
+Subfase F6.3 concluida. Resumo:
+
+**Arquivos criados/editados:**
+1. `archbox/risk/ewma.py` - Classes `EWMA` e `EWMAResult` com volatilidade univariada e covariancia multivariada
+2. `archbox/risk/__init__.py` - Atualizado com import de `EWMA`
+3. `tests/risk/test_ewma.py` - 8 testes cobrindo todos os criterios
+
+**Resultados:**
+- 8/8 testes passando
+- `ruff check archbox/risk/` sem erros (corrigi variáveis `T`, `R`, `H` para snake_case)
+- Todos os 8 criterios de aceite marcados como `[x]` no arquivo de especificacao

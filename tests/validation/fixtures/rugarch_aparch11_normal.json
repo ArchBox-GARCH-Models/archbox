@@ -1,0 +1,23 @@
+{
+    "description": "APARCH(1,1) Normal - rugarch::ugarchfit on SP500 synthetic data",
+    "r_package": "rugarch",
+    "r_version": "1.4-4",
+    "dataset": "sp500",
+    "model": "APARCH(1,1)",
+    "distribution": "normal",
+    "parameters": {
+        "mu": 0.0004,
+        "omega": 6.8e-07,
+        "alpha1": 0.074,
+        "gamma1": 0.064,
+        "beta1": 0.914,
+        "delta": 2.15
+    },
+    "loglikelihood": 7726.7,
+    "persistence": 0.988,
+    "tolerance": {
+        "params_pct": 0.05,
+        "loglike_abs": 1.0
+    },
+    "note": "Reference values from rugarch APARCH on archbox synthetic SP500"
+}

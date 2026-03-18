@@ -1,0 +1,15 @@
+Subfase F4.3 concluida. Resumo dos entregaveis:
+
+1. **`archbox/regime/kim_smoother.py`** — `KimSmoother` com 3 metodos:
+   - `smooth()` — backward recursion com loops explicitos
+   - `smooth_vectorized()` — versao vetorizada com operacoes matriciais
+   - `joint_smoothed()` — probabilidades conjuntas P(S_t=i, S_{t+1}=j | Y_T) para o M-step do EM
+
+2. **`archbox/regime/__init__.py`** — atualizado com export de `KimSmoother`
+
+3. **`tests/regime/test_kim_smoother.py`** — 10 testes, todos passando:
+   - Soma = 1, bounds [0,1], ultimo ponto = filtrado, smoothed menos volatil
+   - Vetorizada = loop, joint shape/soma/nao-negativo/consistencia marginal
+   - 3 regimes
+
+Todos os 10 criterios de aceite foram marcados como concluidos no arquivo de especificacao.

@@ -1,0 +1,17 @@
+FASE 2.7 concluida. Resumo do que foi feito:
+
+### Arquivos criados
+1. **`archbox/utils/news_impact.py`** - `news_impact_curve()`, `plot_news_impact()`, `compare_news_impact()`
+2. **`tests/utils/__init__.py`** - init do pacote de testes
+3. **`tests/utils/test_news_impact.py`** - 8 testes (news impact + integracao)
+
+### Arquivos modificados
+4. **`archbox/models/garch.py`** - adicionado `_one_step_variance()` (faltava no GARCH base)
+5. **`archbox/__init__.py`** - exporta todos os 9 modelos (GARCH + 8 novos)
+6. **`archbox/utils/__init__.py`** - exporta `news_impact_curve`, `plot_news_impact`, `compare_news_impact`
+
+### Resultados
+- **187/187 testes passando** (incluindo 8 novos)
+- **ruff check**: sem erros
+- **Integracao end-to-end**: todos os 8 modelos fitam SP500 com sucesso
+- **Todos os 13 criterios de aceite** marcados como concluidos no FASE2_7.md

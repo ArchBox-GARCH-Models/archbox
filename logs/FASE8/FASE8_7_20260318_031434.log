@@ -1,0 +1,17 @@
+All done. Here's a summary of what was implemented:
+
+**F8.7 - Documentation (MkDocs)** - Complete
+
+- **mkdocs.yml** - Material theme with full navigation, mkdocstrings, MathJax, code copy, search
+- **docs/index.md** - Library overview with features and quick example
+- **Getting Started** (3 pages): installation, quickstart, key-concepts
+- **User Guide** (8 pages): garch, egarch, gjr, multivariate, regime, threshold, risk, distributions
+- **API Reference** (6 pages): core, models, multivariate, regime, risk, diagnostics (with mkdocstrings directives pointing to actual module paths)
+- **Theory** (4 pages): garch-theory, multivariate-theory, regime-theory, risk-theory (with LaTeX formulas)
+- **Benchmarks** (1 page): performance targets
+- **pyproject.toml** updated with `docs` optional dependency group
+- `mkdocs build --strict` passes successfully
+- `ruff check` clean (no Python files in docs)
+- Total: **23 documentation pages** + mkdocs.yml config
+
+Note: I adjusted the API reference mkdocstrings paths to match the actual module structure (e.g., `diagnostics.diagnostics` instead of `diagnostics.diagnostic_tests`, `models.gjr_garch.GJRGARCH` instead of `models.gjr.GJR`, `risk.es` instead of `risk.expected_shortfall`).

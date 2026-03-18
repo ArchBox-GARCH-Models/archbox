@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/archbox/experiment/risk_analysis.py
+# hypothesis_version: 6.151.9
+
+[0.3, 1.5, '#95a5a6', '#e67e22', '#e74c3c', '--', '=', 'Returns', 'Risk Measure', 'Time', 'basel_traffic_light', 'kupiec_test', 'parametric', 'violation_ratio']

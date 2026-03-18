@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/archbox/utils/__init__.py
+# hypothesis_version: 6.151.9
+
+['check_stationarity', 'compare_news_impact', 'news_impact_curve', 'plot_news_impact', 'positive_transform', 'positive_untransform', 'unit_transform', 'unit_untransform', 'validate_returns']

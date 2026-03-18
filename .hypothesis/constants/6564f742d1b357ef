@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/archbox/datasets/load.py
+# hypothesis_version: 6.151.9
+
+[', ', 'bitcoin', 'brazil/ibovespa.csv', 'brazil/usdbrl.csv', 'data', 'description', 'financial/sp500.csv', 'ftse100', 'fx_majors', 'ibovespa', 'path', 'realized_vol', 'sector_indices', 'sp500', 'us_gdp', 'us_unemployment', 'usdbrl']

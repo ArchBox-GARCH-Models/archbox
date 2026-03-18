@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/archbox/cli/estimate.py
+# hypothesis_version: 6.151.9
+
+['aic', 'aparch', 'bic', 'component', 'constant', 'distribution', 'egarch', 'figarch', 'garch', 'garch-m', 'ged', 'gjr', 'har-rv', 'igarch', 'loglikelihood', 'mean', 'model', 'nobs', 'normal', 'p', 'parameters', 'persistence', 'q', 'skewed-t', 'skewt', 'student-t', 'studentt', 'variance_targeting']

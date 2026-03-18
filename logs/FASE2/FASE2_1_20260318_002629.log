@@ -1,0 +1,19 @@
+Subfase F2.1 concluida. Resumo:
+
+**Arquivos criados:**
+1. `archbox/models/egarch.py` - EGARCH(p,q) com recursao em log(sigma^2), sem restricoes de positividade, |beta|<1 via tanh
+2. `archbox/models/gjr_garch.py` - GJR-GARCH(p,q) com indicadora de choque negativo, omega/alpha/beta positivos via exp
+3. `tests/models/test_egarch.py` - 8 testes (instanciacao, recursao, fit, leverage, negativos, forecast, summary, roundtrip)
+4. `tests/models/test_gjr_garch.py` - 8 testes (instanciacao, recursao, fit, leverage, forecast, summary, impacto assimetrico, roundtrip)
+
+**Resultados:**
+- 16/16 testes passando
+- `ruff check` sem erros
+- Todos os 13 criterios de aceite marcados como `[x]` no arquivo de especificacao
+
+**Ajustes em relacao a spec:**
+- Renomeei `T` para `nobs` para satisfazer ruff N806
+- Corrigi `results.loglikelihood` → `results.loglike` (atributo real do ArchResults)
+- Corrigi `len(forecast) == 10` → `len(forecast["variance"]) == 10` (forecast retorna dict)
+- Removi import `pytest` nao utilizado
+- Atualizei `archbox/models/__init__.py` para exportar EGARCH e GJRGARCH

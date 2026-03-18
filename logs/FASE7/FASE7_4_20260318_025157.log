@@ -1,0 +1,11 @@
+F7.4 concluida. Resumo dos entregaveis criados:
+
+1. **`archbox/visualization/correlation_plot.py`** — `plot_dynamic_correlation`, `plot_correlation_heatmap`, `plot_covariance_decomposition`
+2. **`archbox/visualization/distribution_plot.py`** — `plot_distribution_fit` com painel 2x2 (histogram, QQ, tail, CDF) + suporte a Normal, Student-t, Skew-t
+3. **`archbox/visualization/risk_plot.py`** — `plot_var_backtest`, `plot_traffic_light`, `plot_var_comparison`
+4. **`archbox/visualization/__init__.py`** — Atualizado com todos os novos exports
+5. **`tests/visualization/test_correlation_plot.py`** — 6 testes
+6. **`tests/visualization/test_distribution_plot.py`** — 6 testes
+7. **`tests/visualization/test_risk_plot.py`** — 8 testes
+
+Resultados: **67 testes passando**, **ruff sem erros**, todos os 10 criterios de aceite marcados como concluidos.

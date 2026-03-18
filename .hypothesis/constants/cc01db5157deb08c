@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/archbox/regime/__init__.py
+# hypothesis_version: 6.151.9
+
+['EMEstimator', 'HamiltonFilter', 'KimSmoother', 'MarkovSwitchingAR', 'MarkovSwitchingGARCH', 'MarkovSwitchingMean', 'MarkovSwitchingModel', 'MarkovSwitchingVAR', 'RegimeResults']

@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/archbox/regime/em.py
+# hypothesis_version: 6.151.9
+
+[0.0, 1e-300, 1e-12, 1e-08, 1e-06, 1.0, 500, '_m_step_update', 'mu', 'sigma']

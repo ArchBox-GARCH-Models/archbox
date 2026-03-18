@@ -1,0 +1,25 @@
+All done. Here's a summary:
+
+**Files created (7 entregaveis):**
+1. `archbox/experiment/__init__.py` — Module exports
+2. `archbox/experiment/experiment.py` — `ArchExperiment` orchestrator
+3. `archbox/experiment/comparison.py` — `ComparisonResult` dataclass
+4. `archbox/experiment/validation.py` — `ValidationResult` dataclass
+5. `archbox/experiment/risk_analysis.py` — `RiskAnalysisResult` dataclass
+6. `tests/experiment/__init__.py` — Test package init
+7. `tests/experiment/test_experiment.py` — 11 tests
+
+**Key adaptations from spec to match actual project API:**
+- `result.loglikelihood` → `result.loglike` (actual attribute name)
+- `result.persistence` → `result.persistence()` (it's a method, not property)
+- `forecast.variance` → `forecast["variance"]` (returns dict, not object)
+- `archbox.models.gjr.GJR` → `archbox.models.gjr_garch.GJRGARCH`
+- `archbox.models.component` → `archbox.models.component_garch`
+- `archbox.reporting.report_manager` → `archbox.report.report_manager`
+- `ExpectedShortfall.compute(method=)` → method-specific calls (`parametric()`, `historical()`, etc.)
+- `bt.traffic_light()` → `bt.basel_traffic_light()`
+
+**Verification results:**
+- 11/11 tests passed
+- `ruff check archbox/experiment/` — all checks passed
+- All 12 acceptance criteria marked as complete

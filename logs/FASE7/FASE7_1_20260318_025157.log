@@ -1,0 +1,15 @@
+FASE7_1 concluida. Resumo:
+
+**Arquivos criados (7):**
+- `archbox/visualization/__init__.py` — modulo com exports
+- `archbox/visualization/themes.py` — 4 temas (Professional, Academic, Presentation, Risk) com `Theme` dataclass, `get_theme()`, `list_themes()`, `register_theme()`
+- `archbox/visualization/export.py` — `export_png`, `export_svg`, `export_pdf`, `export_html`
+- `archbox/visualization/volatility_plot.py` — `plot_volatility()` (3 paineis) e `plot_variance_persistence()` (ACF + half-life)
+- `tests/visualization/__init__.py`
+- `tests/visualization/test_themes.py` — 10 testes
+- `tests/visualization/test_volatility_plot.py` — 10 testes (incluindo export PDF)
+
+**Resultados:**
+- 20/20 testes passando
+- `ruff check` sem erros
+- Todos os 12 criterios de aceite marcados como `[x]`

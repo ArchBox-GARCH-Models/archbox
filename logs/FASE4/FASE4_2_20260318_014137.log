@@ -1,0 +1,11 @@
+F4.2 completa. Resumo:
+
+**Arquivos criados/editados:**
+1. `archbox/regime/hamilton_filter.py` — Hamilton Filter com `filter()`, `filter_vectorized()` e `ergodic_probabilities()`
+2. `archbox/regime/__init__.py` — Atualizado com export do `HamiltonFilter`
+3. `tests/regime/test_hamilton_filter.py` — 11 testes cobrindo todos os criterios
+
+**Resultados:**
+- 11/11 testes passando
+- `ruff check` sem erros
+- Todos os 10 criterios de aceite marcados como concluidos

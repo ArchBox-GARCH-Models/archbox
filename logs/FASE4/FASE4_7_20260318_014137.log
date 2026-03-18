@@ -1,0 +1,17 @@
+Subfase F4.7 complete. Here's a summary:
+
+## Deliverables Created
+
+1. **`archbox/regime/ms_garch.py`** - MS-GARCH (Gray 1996) with collapsing approach for path-dependence
+2. **`archbox/regime/ms_var.py`** - MS-VAR (Krolzig 1997) with EM estimation for multivariate regime-switching
+3. **`archbox/regime/__init__.py`** - Updated with `MarkovSwitchingGARCH` and `MarkovSwitchingVAR` exports
+4. **`tests/regime/test_ms_garch.py`** - 6 tests (two regimes, variance positive, Gray collapsing, persistence, summary, param names)
+5. **`tests/regime/test_ms_var.py`** - 5 tests (fit, covariance PD, attributes, summary, transition matrix)
+6. **`tests/regime/test_results.py`** - 9 tests (AIC, BIC, n_params, nobs, durations, ergodic probs, classify, summary)
+7. **`tests/regime/test_integration.py`** - 4 tests (MS-Mean e2e, MS-AR with GDP, MS-GARCH e2e, all imports)
+
+## Results
+
+- **93/93 tests pass** across the entire `tests/regime/` suite
+- **`ruff check archbox/regime/`** - All checks passed
+- All 16 acceptance criteria marked as complete in the spec file

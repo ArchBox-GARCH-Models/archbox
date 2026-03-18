@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/archbox/core/config.py
+# hypothesis_version: 6.151.9
+
+[1e-08, 500, 'SLSQP', 'ewm']

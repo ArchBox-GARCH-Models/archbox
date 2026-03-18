@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/archbox/report/template_manager.py
+# hypothesis_version: 6.151.9
+
+[0.001, 0.01, 0.05, 0.1, '*', '**', '***', '<0.001', 'fmt_number', 'fmt_percent', 'fmt_pvalue', 'html', 'significance_stars', 'templates']

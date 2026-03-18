@@ -1,0 +1,13 @@
+F1.1 concluida. Todos os 11 criterios de aceite verificados:
+
+1. Estrutura de diretorios criada com todos os modulos
+2. `pyproject.toml` com todas as dependencias e dev extras
+3. `pip install -e ".[dev]"` instalou sem erros
+4. `from archbox import __version__` retorna "0.1.0"
+5. `load_dataset('sp500')` retorna DataFrame com 2500 linhas e colunas `date`, `returns`
+6. `validate_returns` rejeita NaN, Inf, multi-dim e arrays < 10 obs
+7. `positive_transform` / `positive_untransform` sao inversos exatos
+8. `unit_transform` / `unit_untransform` sao inversos exatos
+9. `check_stationarity` retorna True para persistencia < 1 e False para >= 1
+10. `ruff check archbox/` passa sem erros (1 fix de import sorting aplicado)
+11. Todos os `__init__.py` criados nos modulos e submodulos de tests

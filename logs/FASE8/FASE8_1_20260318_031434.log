@@ -1,0 +1,14 @@
+All done. Here's the summary:
+
+**F8.1 - CLI complete.** All files were already implemented and needed only one minor fix:
+
+- **Fix**: Added `strict=False` to `zip()` in `estimate.py:149` to satisfy ruff's `B905` rule.
+
+**Verification results:**
+- `archbox --help` shows all 4 subcommands (estimate, risk, backtest, regime)
+- `archbox --version` prints `archbox 0.1.0`
+- All 4 subcommand `--help` outputs show correct options
+- `estimate --model garch` produces JSON output (tested via pytest)
+- `[project.scripts]` already in `pyproject.toml`
+- **8/8 tests passed**
+- **ruff check: all checks passed**

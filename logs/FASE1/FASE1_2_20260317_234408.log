@@ -1,0 +1,11 @@
+F1.2 concluida. Resumo dos entregaveis:
+
+1. **`archbox/core/volatility_model.py`** — Classe base abstrata `VolatilityModel` com 7 metodos abstratos (`_variance_recursion`, `start_params`, `param_names`, `transform_params`, `untransform_params`, `bounds`, `num_params`) e metodos concretos (`fit`, `loglike`, `loglike_per_obs`, `simulate`, `_backcast`)
+
+2. **`archbox/core/__init__.py`** — Atualizado com export de `VolatilityModel`
+
+3. **`tests/core/test_volatility_model.py`** — 11 testes, todos passando
+
+Tambem criei as dependencias necessarias que ainda nao existiam:
+- `archbox/distributions/base.py` — ABC `Distribution`
+- `archbox/distributions/normal.py` — Distribuicao Normal com `loglikelihood` e `simulate`

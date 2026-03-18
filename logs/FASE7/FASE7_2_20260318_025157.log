@@ -1,0 +1,12 @@
+Subfase F7.2 concluida. Resumo:
+
+**Arquivos criados:**
+- `archbox/visualization/news_impact_plot.py` — `plot_news_impact()` e `plot_news_impact_comparison()` com fallback para calculo NIC a partir de parametros GARCH
+- `archbox/visualization/diagnostics_plot.py` — `plot_diagnostics()` com painel 2x2 (residuos padronizados, ACF de z^2, QQ-plot, histograma)
+- `tests/visualization/test_news_impact_plot.py` — 5 testes incluindo verificacao de assimetria EGARCH
+- `tests/visualization/test_diagnostics_plot.py` — 6 testes incluindo validacao dos 4 paineis e fallback de std_resid
+
+**Arquivo atualizado:**
+- `archbox/visualization/__init__.py` — exports de `plot_news_impact`, `plot_news_impact_comparison`, `plot_diagnostics`
+
+**Verificacoes:** 11/11 testes passando, `ruff check` sem erros, todos os 10 criterios de aceite marcados.

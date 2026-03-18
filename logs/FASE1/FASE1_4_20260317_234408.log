@@ -1,0 +1,8 @@
+Subfase F1.4 concluida. Resumo:
+
+**Arquivos criados/editados:**
+1. `archbox/core/results.py` — Classe `ArchResults` com parametros, SE, t-values, p-values, AIC/BIC/HQIC, persistence, half-life, unconditional variance, forecast, summary, plot, to_dataframe, save/load
+2. `archbox/core/__init__.py` — Adicionado export de `ArchResults`
+3. `tests/core/test_results.py` — 17 testes cobrindo todos os criterios
+
+**Resultados:** 17/17 testes passando, ruff check sem erros, todos os 14 criterios de aceite marcados como concluidos.

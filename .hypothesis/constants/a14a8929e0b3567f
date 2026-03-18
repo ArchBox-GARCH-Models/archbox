@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/archbox/distributions/ged.py
+# hypothesis_version: 6.151.9
+
+[-2.0, 0.0, 1e-06, 0.1, 0.5, 1.0, 1.5, 2.0, 3.0, 20.0, 'GED', 'nu']

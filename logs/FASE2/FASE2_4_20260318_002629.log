@@ -1,0 +1,15 @@
+Subfase F2.4 concluida. Resumo:
+
+**Arquivos criados:**
+1. `archbox/models/component_garch.py` - Component GARCH (Engle & Lee, 1999) com decomposicao permanente/transitorio
+2. `archbox/models/har_rv.py` - HAR-RV (Corsi, 2009) com regressao OLS
+3. `tests/models/test_component_garch.py` - 8 testes
+4. `tests/models/test_har_rv.py` - 10 testes
+
+**Arquivo atualizado:**
+- `archbox/models/__init__.py` - exports de `ComponentGARCH` e `HARRV`
+
+**Resultados:**
+- 18/18 testes passando
+- `ruff check` sem erros
+- Todos os 14 criterios de aceite marcados como concluidos

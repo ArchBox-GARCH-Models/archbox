@@ -1,0 +1,11 @@
+Subfase F5.3 concluída. Resumo:
+
+**Arquivos criados/editados:**
+1. `archbox/threshold/setar.py` — Modelo SETAR com suporte a 2 e 3 regimes, seleção automática de delay via AIC/BIC
+2. `archbox/threshold/__init__.py` — Adicionado import e export de `SETAR`
+3. `tests/threshold/test_setar.py` — 8 testes cobrindo todos os critérios
+
+**Resultados:**
+- 8/8 testes passando
+- `ruff check` sem erros
+- Todos os 10 critérios de aceite marcados como concluídos

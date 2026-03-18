@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/archbox/visualization/distribution_plot.py
+# hypothesis_version: 6.151.9
+
+[1e-12, 0.3, 0.4, 0.5, 0.8, 1.0, 1.02, 1.5, 300, '#1f4e79', '#c00000', '#cccccc', '$z_t$', '--', ':', 'CDF Comparison', 'Density', 'Empirical', 'Empirical CDF', 'Left Tail Comparison', 'Normal', 'P(Z ≤ z) [log scale]', 'Sample Quantiles', 'accent', 'grid', 'lower right', 'none', 'normal', 'primary', 'professional', 'secondary', 'skewt', 'std_resid', 'studentt', 'title', 'upper left', 'upper right', 'white']

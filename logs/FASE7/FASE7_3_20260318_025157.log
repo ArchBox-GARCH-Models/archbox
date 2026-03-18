@@ -1,0 +1,9 @@
+Subfase F7.3 concluida. Resumo dos entregaveis:
+
+1. **`archbox/visualization/regime_plot.py`** - `plot_regimes()` (3 paineis: serie com shading, probabilidades suavizadas, duracoes esperadas) + `plot_transition_matrix()` (heatmap anotado)
+2. **`archbox/visualization/transition_plot.py`** - `plot_transition_function()` (curva G(s) para LSTAR/ESTAR com gammas sobrepostos) + `plot_phase_diagram()` (scatter y_t vs y_{t-1} colorido por regime)
+3. **`archbox/visualization/__init__.py`** - Atualizado com os 4 novos exports
+4. **`tests/visualization/test_regime_plot.py`** - 6 testes
+5. **`tests/visualization/test_transition_plot.py`** - 10 testes
+
+Todos os 16 testes passam e `ruff check` esta limpo.

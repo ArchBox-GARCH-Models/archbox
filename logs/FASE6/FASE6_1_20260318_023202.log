@@ -1,0 +1,11 @@
+Subfase F6.1 concluida. Resumo:
+
+**Arquivos criados:**
+1. `archbox/risk/__init__.py` - modulo risk com export de `ValueAtRisk`
+2. `archbox/risk/var.py` - classe `ValueAtRisk` com 4 metodos (parametric, historical, filtered_historical, monte_carlo)
+3. `tests/risk/__init__.py` - init de testes
+4. `tests/risk/test_var.py` - 8 testes cobrindo todos os metodos e edge cases
+
+**Ajuste feito:** O teste de Student-t vs Normal usa `alpha=0.01` em vez de 0.05, pois com o fator de correcao `sqrt((nu-2)/nu)` as caudas mais pesadas da Student-t so dominam em quantis mais extremos (1% mas nao 5%).
+
+**Resultados:** 8/8 testes passando, ruff check sem erros.

@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/archbox/distributions/__init__.py
+# hypothesis_version: 6.151.9
+
+['Distribution', 'GeneralizedError', 'MixtureNormal', 'Normal', 'SkewedT', 'StudentT']

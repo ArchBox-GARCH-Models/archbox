@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/archbox/report/transformers/risk.py
+# hypothesis_version: 6.151.9
+
+[0.0, 0.99, 250, 'Acceptable', 'Accurate', 'Inaccurate', 'Risk Analysis', 'backtest', 'christoffersen', 'comparison', 'confidence_level', 'es', 'es_stats', 'expected_violations', 'green', 'kupiec', 'max', 'mean', 'method_comparison', 'min', 'model_name', 'n_obs', 'n_observations', 'n_violations', 'nobs', 'red', 'returns', 'status', 'std', 'thresholds', 'traffic_light', 'var', 'var_stats', 'violation_ratio', 'violations', 'yellow', 'zone']

@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/archbox/utils/backend.py
+# hypothesis_version: 6.151.9
+
+['auto', 'numba', 'python']

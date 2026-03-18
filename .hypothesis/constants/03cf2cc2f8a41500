@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/archbox/experiment/validation.py
+# hypothesis_version: 6.151.9
+
+[0.05, 0.3, 1.5, '#95a5a6', '#e74c3c', 'Forecast Vol', 'Time', 'Volatility', '|Returns|']

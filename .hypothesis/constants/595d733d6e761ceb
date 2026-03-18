@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/archbox/visualization/risk_plot.py
+# hypothesis_version: 6.151.9
+
+[0.1, 0.15, 0.4, 0.5, 0.6, 0.7, 0.8, 0.99, 1.0, 1.1, 1.5, 2.5, 250, '#1f4e79', '#548235', '#7f7f7f', '#c00000', '#cccccc', '#ff6600', '#ffc000', '-', '--', '-.', ':', 'ES', 'Green/Yellow', 'Observation', 'Return / VaR', 'Returns', 'Traffic Light Test', 'Yellow/Red', 'confidence_level', 'es', 'es_line', 'grid', 'lower left', 'negative', 'o', 'positive', 'primary', 'returns', 'risk', 'secondary', 'upper right', 'valid', 'var_line', 'white', 'zone_green', 'zone_red', 'zone_yellow']
