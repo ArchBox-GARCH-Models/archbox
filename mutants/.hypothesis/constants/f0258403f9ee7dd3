@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/mutants/archbox/experiment/risk_analysis.py
+# hypothesis_version: 6.151.9
+
+[0.3, 1.5, '#95a5a6', '#e67e22', '#e74c3c', '--', '.', '=', 'MUTANT_UNDER_TEST', 'Mutant', 'Returns', 'Risk Measure', 'Time', '__mutmut_', 'basel_traffic_light', 'fail', 'kupiec_test', 'parametric', 'stats', 'violation_ratio']

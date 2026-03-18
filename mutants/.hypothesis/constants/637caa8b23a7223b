@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/mutants/archbox/models/__init__.py
+# hypothesis_version: 6.151.9
+
+['.', 'APARCH', 'ComponentGARCH', 'EGARCH', 'FIGARCH', 'GARCH', 'GARCHM', 'GJRGARCH', 'HARRV', 'IGARCH', 'MUTANT_UNDER_TEST', 'Mutant', '__mutmut_', 'fail', 'stats']

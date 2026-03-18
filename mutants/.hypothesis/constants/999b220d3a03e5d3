@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/mutants/archbox/report/exporters/__init__.py
+# hypothesis_version: 6.151.9
+
+['.', 'HTMLExporter', 'LaTeXExporter', 'MUTANT_UNDER_TEST', 'MarkdownExporter', 'Mutant', '__mutmut_', 'fail', 'stats']

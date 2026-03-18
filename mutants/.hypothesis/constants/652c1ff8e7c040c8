@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/mutants/archbox/report/exporters/latex.py
+# hypothesis_version: 6.151.9
+
+[' & ', ' \\\\', '.', '0.9\\textwidth', 'MUTANT_UNDER_TEST', 'Mutant', 'UTF-8', 'XXutf-8XX', '\\begin{figure}[htbp]', '\\begin{table}[htbp]', '\\bottomrule', '\\centering', '\\end{figure}', '\\end{table}', '\\end{tabular}', '\\midrule', '\\toprule', '__mutmut_', 'fail', 'l', 'r', 'stats', 'utf-8']

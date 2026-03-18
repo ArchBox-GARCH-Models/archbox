@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/mutants/archbox/__version__.py
+# hypothesis_version: 6.151.9
+
+['.', '0.1.0', 'MUTANT_UNDER_TEST', 'Mutant', '__mutmut_', 'fail', 'stats']

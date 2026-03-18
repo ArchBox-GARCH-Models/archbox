@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/mutants/archbox/regime/__init__.py
+# hypothesis_version: 6.151.9
+
+['.', 'EMEstimator', 'HamiltonFilter', 'KimSmoother', 'MUTANT_UNDER_TEST', 'MarkovSwitchingAR', 'MarkovSwitchingGARCH', 'MarkovSwitchingMean', 'MarkovSwitchingModel', 'MarkovSwitchingVAR', 'Mutant', 'RegimeResults', '__mutmut_', 'fail', 'stats']

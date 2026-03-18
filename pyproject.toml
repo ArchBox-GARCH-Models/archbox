@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling<1.22"]
 build-backend = "hatchling.build"
 
 [project]
@@ -43,6 +43,12 @@ docs = [
 
 [project.scripts]
 archbox = "archbox.cli.main:main"
+
+[tool.hatch.build.targets.sdist]
+exclude = ["logs/", "site/", "docs/", "tests/", ".github/"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["archbox"]
 
 [tool.hatch.version]
 path = "archbox/__version__.py"
@@ -97,3 +103,8 @@ reportMissingTypeArgument = false
 reportMissingImports = false
 reportUnnecessaryIsInstance = false
 reportUnusedVariable = false
+
+[tool.mutmut]
+paths_to_mutate = "archbox/core/"
+tests_dir = "tests/"
+runner = "python -m pytest tests/core/ tests/estimation/ -x --tb=no -q"

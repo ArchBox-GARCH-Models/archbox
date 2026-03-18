@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/mutants/archbox/utils/transforms.py
+# hypothesis_version: 6.151.9
+
+[0.9999, 1.0, 1.9999, 2.0, '.', 'MUTANT_UNDER_TEST', 'Mutant', '__mutmut_', 'fail', 'stats', 'x_positive_transform', 'x_unit_transform', 'x_unit_untransform']

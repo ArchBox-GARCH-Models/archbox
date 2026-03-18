@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/mutants/archbox/regime/kim_smoother.py
+# hypothesis_version: 6.151.9
+
+[0.0, 1e-300, 1.0, '.', 'MUTANT_UNDER_TEST', 'Mutant', '__mutmut_', 'fail', 'stats', 'xǁKimSmootherǁsmooth']

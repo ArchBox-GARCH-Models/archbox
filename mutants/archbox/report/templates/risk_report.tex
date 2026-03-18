@@ -1,0 +1,43 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{booktabs}
+\usepackage[margin=2.5cm]{geometry}
+
+\title{ {{ title | default('Risk Analysis Report') }} }
+\author{archbox}
+\date{ {{ generated_at | default('') }} }
+
+\begin{document}
+\maketitle
+
+\section{Summary}
+Confidence Level: {{ confidence_level | fmt_percent if confidence_level is defined else '99\%' }}, Observations: {{ n_obs | default(0) }}
+
+{% if backtest is defined %}
+\section{Backtest Results}
+\begin{table}[htbp]
+\centering
+\begin{tabular}{lr}
+\toprule
+Metric & Value \\
+\midrule
+{% if backtest.n_violations is defined %}
+Violations & {{ backtest.n_violations }} \\
+{% endif %}
+{% if backtest.expected_violations is defined %}
+Expected Violations & {{ backtest.expected_violations | fmt_number(1) }} \\
+{% endif %}
+{% if backtest.violation_ratio is defined %}
+Violation Ratio & {{ backtest.violation_ratio | fmt_number(3) }} \\
+{% endif %}
+\bottomrule
+\end{tabular}
+\end{table}
+{% endif %}
+
+{% if traffic_light is defined and traffic_light.zone is defined %}
+\section{Traffic Light}
+Zone: \textbf{ {{ traffic_light.zone | upper }} } ({{ traffic_light.status }})
+{% endif %}
+
+\end{document}

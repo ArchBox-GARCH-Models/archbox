@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/mutants/archbox/multivariate/__init__.py
+# hypothesis_version: 6.151.9
+
+['.', 'BEKK', 'CCC', 'DCC', 'DECO', 'GOGARCH', 'MUTANT_UNDER_TEST', 'MultivarResults', 'Mutant', '__mutmut_', 'fail', 'portfolio_variance', 'portfolio_volatility', 'risk_contribution', 'risk_decomposition', 'stats']

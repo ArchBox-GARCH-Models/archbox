@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/mutants/archbox/diagnostics/arch_lm.py
+# hypothesis_version: 6.151.9
+
+[0.0, 1e-20, 1.0, '.', 'ARCH-LM', 'MUTANT_UNDER_TEST', 'Mutant', 'XXARCH-LMXX', '__mutmut_', 'arch-lm', 'fail', 'stats', 'x_arch_lm_test']

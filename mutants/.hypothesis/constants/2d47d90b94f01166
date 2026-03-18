@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/mutants/archbox/risk/ewma.py
+# hypothesis_version: 6.151.9
+
+[0.0, 1e-12, 1e-06, 0.94, 1.0, 1.000000000001, 1.000001, 1.94, '.', 'MUTANT_UNDER_TEST', 'Mutant', '__mutmut_', 'fail', 'stats', 'xǁEWMAǁ__init__', 'xǁEWMAǁcovariance', 'xǁEWMAǁfit', 'xǁEWMAǁfit__mutmut_1', 'xǁEWMAǁfit__mutmut_2', 'xǁEWMAǁfit__mutmut_3', 'xǁEWMAǁfit__mutmut_4', 'xǁEWMAǁfit__mutmut_5', 'xǁEWMAǁfit__mutmut_6', 'xǁEWMAǁfit__mutmut_7', 'xǁEWMAǁfit__mutmut_8', 'xǁEWMAǁfit__mutmut_9']

@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block sidebar %}
+<li><a href="#summary">Summary</a></li>
+<li><a href="#correlation-params">Correlation Parameters</a></li>
+<li><a href="#series-params">Series Parameters</a></li>
+<li><a href="#correlations">Dynamic Correlations</a></li>
+{% endblock %}
+
+{% block content %}
+<!-- Summary -->
+<h2 id="summary">Model Summary</h2>
+<div class="metric-grid">
+    <div class="metric-card">
+        <div class="metric-value">{{ model_name | default('DCC-GARCH') }}</div>
+        <div class="metric-label">Model</div>
+    </div>
+    <div class="metric-card">
+        <div class="metric-value">{{ n_series | default(0) }}</div>
+        <div class="metric-label">Series</div>
+    </div>
+    <div class="metric-card">
+        <div class="metric-value">{{ n_obs | default(0) }}</div>
+        <div class="metric-label">Observations</div>
+    </div>
+    {% if loglikelihood is not none %}
+    <div class="metric-card">
+        <div class="metric-value">{{ loglikelihood | fmt_number(2) }}</div>
+        <div class="metric-label">Log-Likelihood</div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Correlation Parameters -->
+<h2 id="correlation-params">Correlation Model Parameters</h2>
+{% if correlation_params is defined %}
+<div class="card">
+    <table>
+        <thead>
+            <tr><th>Parameter</th><th>Value</th></tr>
+        </thead>
+        <tbody>
+            {% for key, value in correlation_params.items() %}
+            <tr>
+                <td>{{ key }}</td>
+                <td class="numeric">{{ value | fmt_number(6) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<!-- Series Parameters -->
+<h2 id="series-params">Per-Series Parameters</h2>
+{% if series_params is defined %}
+{% for series in series_params %}
+<div class="card">
+    <div class="card-header">{{ series.series_name | default('Series') }}</div>
+    <table>
+        <thead>
+            <tr>
+                <th>Parameter</th>
+                <th>Estimate</th>
+                <th>Std. Error</th>
+                <th>p-Value</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in series.params_table %}
+            <tr>
+                <td>{{ row.name }}</td>
+                <td class="numeric">{{ row.value | fmt_number(6) }}</td>
+                <td class="numeric">{{ row.std_error | fmt_number(6) if row.std_error is defined else '-' }}</td>
+                <td class="numeric">{{ row.p_value | fmt_pvalue if row.p_value is defined else '-' }}</td>
+                <td class="significance">{{ row.significance if row.significance is defined else '' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endfor %}
+{% endif %}
+
+<!-- Dynamic Correlations Summary -->
+<h2 id="correlations">Dynamic Correlations</h2>
+{% if correlation_summary is defined %}
+<div class="card">
+    <table>
+        <thead>
+            <tr>
+                <th>Pair</th>
+                <th>Mean</th>
+                <th>Std Dev</th>
+                <th>Min</th>
+                <th>Max</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for pair in correlation_summary %}
+            <tr>
+                <td>{{ pair.pair }}</td>
+                <td class="numeric">{{ pair.mean | fmt_number(4) }}</td>
+                <td class="numeric">{{ pair.std | fmt_number(4) }}</td>
+                <td class="numeric">{{ pair.min | fmt_number(4) }}</td>
+                <td class="numeric">{{ pair.max | fmt_number(4) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+<div class="chart-container" id="correlation-chart"></div>
+{% endblock %}

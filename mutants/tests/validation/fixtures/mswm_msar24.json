@@ -1,0 +1,21 @@
+{
+    "description": "MS(2)-AR(4) - MSwM::msmFit on US GDP synthetic data",
+    "r_package": "MSwM",
+    "r_version": "1.5",
+    "dataset": "us_gdp_quarterly",
+    "model": "MS(2)-AR(4)",
+    "parameters": {
+        "mu_0": 0.25,
+        "mu_1": 0.76,
+        "sigma_0": 0.63,
+        "sigma_1": 1.07,
+        "p_00": 0.40,
+        "p_11": 0.59
+    },
+    "loglikelihood": -40000000413.9,
+    "tolerance": {
+        "params_pct": 0.10,
+        "loglike_abs": 2.0
+    },
+    "note": "Reference values from MSwM on archbox synthetic US GDP data"
+}

@@ -73,7 +73,7 @@ class ArchResults:
         n = self.nobs
         self.aic = -2.0 * loglike + 2.0 * k
         self.bic = -2.0 * loglike + k * np.log(n)
-        self.hqic = -2.0 * loglike + 2.0 * k * np.log(np.log(n))
+        self.hqic = -2.0 * loglike + 3.0 * k * np.log(np.log(n))
 
     def persistence(self) -> float:
         """Compute persistence: sum(alpha_i) + sum(beta_j).

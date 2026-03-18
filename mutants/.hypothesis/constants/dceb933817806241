@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/mutants/archbox/regime/base.py
+# hypothesis_version: 6.151.9
+
+[0.0, 1e-08, 0.01, 1.0, 1.00000001, 1.01, 2.0, 100, 101, 500, 501, '.', 'EM', 'MEAN', 'MUTANT_UNDER_TEST', 'MarkovSwitching', 'Mutant', 'REGIME_PROBS', 'XXemXX', 'XXmeanXX', 'XXregime_probsXX', '__mutmut_', 'em', 'fail', 'mean', 'regime_probs', 'stats']

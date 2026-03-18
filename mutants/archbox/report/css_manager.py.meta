@@ -1,0 +1,12 @@
+{
+    "exit_code_by_key": {
+        "archbox.report.css_manager.x\u01c1CSSManager\u01c1get_css__mutmut_1": null,
+        "archbox.report.css_manager.x\u01c1CSSManager\u01c1get_css__mutmut_2": null,
+        "archbox.report.css_manager.x\u01c1CSSManager\u01c1get_css__mutmut_3": null,
+        "archbox.report.css_manager.x\u01c1CSSManager\u01c1get_css__mutmut_4": null,
+        "archbox.report.css_manager.x\u01c1CSSManager\u01c1get_css__mutmut_5": null
+    },
+    "durations_by_key": {},
+    "type_check_error_by_key": {},
+    "estimated_durations_by_key": {}
+}

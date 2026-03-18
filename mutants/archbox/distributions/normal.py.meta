@@ -1,0 +1,25 @@
+{
+    "exit_code_by_key": {
+        "archbox.distributions.normal.x\u01c1Normal\u01c1loglikelihood__mutmut_1": null,
+        "archbox.distributions.normal.x\u01c1Normal\u01c1loglikelihood__mutmut_2": null,
+        "archbox.distributions.normal.x\u01c1Normal\u01c1loglikelihood__mutmut_3": null,
+        "archbox.distributions.normal.x\u01c1Normal\u01c1loglikelihood__mutmut_4": null,
+        "archbox.distributions.normal.x\u01c1Normal\u01c1loglikelihood__mutmut_5": null,
+        "archbox.distributions.normal.x\u01c1Normal\u01c1loglikelihood__mutmut_6": null,
+        "archbox.distributions.normal.x\u01c1Normal\u01c1loglikelihood__mutmut_7": null,
+        "archbox.distributions.normal.x\u01c1Normal\u01c1loglikelihood__mutmut_8": null,
+        "archbox.distributions.normal.x\u01c1Normal\u01c1loglikelihood__mutmut_9": null,
+        "archbox.distributions.normal.x\u01c1Normal\u01c1ppf__mutmut_1": null,
+        "archbox.distributions.normal.x\u01c1Normal\u01c1ppf__mutmut_2": null,
+        "archbox.distributions.normal.x\u01c1Normal\u01c1cdf__mutmut_1": null,
+        "archbox.distributions.normal.x\u01c1Normal\u01c1cdf__mutmut_2": null,
+        "archbox.distributions.normal.x\u01c1Normal\u01c1simulate__mutmut_1": null,
+        "archbox.distributions.normal.x\u01c1Normal\u01c1start_params__mutmut_1": null,
+        "archbox.distributions.normal.x\u01c1Normal\u01c1start_params__mutmut_2": null,
+        "archbox.distributions.normal.x\u01c1Normal\u01c1start_params__mutmut_3": null,
+        "archbox.distributions.normal.x\u01c1Normal\u01c1start_params__mutmut_4": null
+    },
+    "durations_by_key": {},
+    "type_check_error_by_key": {},
+    "estimated_durations_by_key": {}
+}

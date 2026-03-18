@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block sidebar %}
+<li><a href="#summary">Summary</a></li>
+<li><a href="#var-stats">VaR Statistics</a></li>
+<li><a href="#backtest">Backtest Results</a></li>
+<li><a href="#traffic-light">Traffic Light</a></li>
+<li><a href="#charts">Charts</a></li>
+{% endblock %}
+
+{% block content %}
+<!-- Summary -->
+<h2 id="summary">Risk Analysis Summary</h2>
+<div class="metric-grid">
+    <div class="metric-card">
+        <div class="metric-value">{{ confidence_level | fmt_percent if confidence_level is defined else '99%' }}</div>
+        <div class="metric-label">Confidence Level</div>
+    </div>
+    <div class="metric-card">
+        <div class="metric-value">{{ n_obs | default(0) }}</div>
+        <div class="metric-label">Observations</div>
+    </div>
+    {% if backtest is defined and backtest.n_violations is defined %}
+    <div class="metric-card">
+        <div class="metric-value">{{ backtest.n_violations }}</div>
+        <div class="metric-label">Violations</div>
+    </div>
+    <div class="metric-card">
+        <div class="metric-value">{{ backtest.violation_ratio | fmt_number(2) }}</div>
+        <div class="metric-label">Violation Ratio</div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- VaR Statistics -->
+<h2 id="var-stats">VaR Statistics</h2>
+{% if var_stats is defined %}
+<div class="card">
+    <table>
+        <thead>
+            <tr><th>Statistic</th><th>VaR</th>{% if es_stats is defined %}<th>ES</th>{% endif %}</tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Mean</td>
+                <td class="numeric">{{ var_stats.mean | fmt_number(6) }}</td>
+                {% if es_stats is defined %}<td class="numeric">{{ es_stats.mean | fmt_number(6) }}</td>{% endif %}
+            </tr>
+            <tr>
+                <td>Std Dev</td>
+                <td class="numeric">{{ var_stats.std | fmt_number(6) }}</td>
+                {% if es_stats is defined %}<td class="numeric">{{ es_stats.std | fmt_number(6) }}</td>{% endif %}
+            </tr>
+            <tr>
+                <td>Min</td>
+                <td class="numeric">{{ var_stats.min | fmt_number(6) }}</td>
+                {% if es_stats is defined %}<td class="numeric">{{ es_stats.min | fmt_number(6) }}</td>{% endif %}
+            </tr>
+            <tr>
+                <td>Max</td>
+                <td class="numeric">{{ var_stats.max | fmt_number(6) }}</td>
+                {% if es_stats is defined %}<td class="numeric">{{ es_stats.max | fmt_number(6) }}</td>{% endif %}
+            </tr>
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<!-- Backtest Results -->
+<h2 id="backtest">Backtest Results</h2>
+{% if backtest is defined %}
+<div class="card">
+    <table>
+        <thead>
+            <tr><th>Metric</th><th>Value</th></tr>
+        </thead>
+        <tbody>
+            {% if backtest.n_violations is defined %}
+            <tr><td>Violations</td><td class="numeric">{{ backtest.n_violations }}</td></tr>
+            {% endif %}
+            {% if backtest.expected_violations is defined %}
+            <tr><td>Expected Violations</td><td class="numeric">{{ backtest.expected_violations | fmt_number(1) }}</td></tr>
+            {% endif %}
+            {% if backtest.violation_ratio is defined %}
+            <tr><td>Violation Ratio</td><td class="numeric">{{ backtest.violation_ratio | fmt_number(3) }}</td></tr>
+            {% endif %}
+            {% if backtest.kupiec is defined %}
+            <tr><td>Kupiec LR stat</td><td class="numeric">{{ backtest.kupiec.stat | fmt_number(3) }}</td></tr>
+            <tr><td>Kupiec p-value</td><td class="numeric">{{ backtest.kupiec.pvalue | fmt_pvalue }}</td></tr>
+            {% endif %}
+            {% if backtest.christoffersen is defined %}
+            <tr><td>Christoffersen LR stat</td><td class="numeric">{{ backtest.christoffersen.stat | fmt_number(3) }}</td></tr>
+            <tr><td>Christoffersen p-value</td><td class="numeric">{{ backtest.christoffersen.pvalue | fmt_pvalue }}</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<!-- Traffic Light -->
+<h2 id="traffic-light">Traffic Light Assessment</h2>
+{% if traffic_light is defined and traffic_light.zone is defined %}
+<div class="card">
+    <div class="metric-grid">
+        <div class="metric-card" style="background: {% if traffic_light.zone == 'green' %}#e8f5e9{% elif traffic_light.zone == 'yellow' %}#fff8e1{% else %}#ffebee{% endif %};">
+            <div class="metric-value" style="color: {% if traffic_light.zone == 'green' %}#2e7d32{% elif traffic_light.zone == 'yellow' %}#f57f17{% else %}#c62828{% endif %};">
+                {{ traffic_light.zone | upper }}
+            </div>
+            <div class="metric-label">{{ traffic_light.status }}</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-value">{{ traffic_light.n_violations }}</div>
+            <div class="metric-label">Violations</div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Charts -->
+<h2 id="charts">Charts</h2>
+<div class="chart-container" id="var-backtest-chart"></div>
+<div class="chart-container" id="traffic-light-chart"></div>
+{% endblock %}

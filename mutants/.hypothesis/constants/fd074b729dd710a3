@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/mutants/archbox/multivariate/portfolio.py
+# hypothesis_version: 6.151.9
+
+[0.0, 1e-12, 1e-08, 1.0, 1.000000000001, 1.00000001, '.', 'MUTANT_UNDER_TEST', 'Mutant', 'PCT_CONTRIBUTION', 'PORTFOLIO_VOLATILITY', 'RISK_CONTRIBUTION', 'WEIGHTS', 'XXpct_contributionXX', 'XXweightsXX', '__mutmut_', 'fail', 'pct_contribution', 'portfolio_volatility', 'risk_contribution', 'stats', 'weights', 'x_portfolio_variance', 'x_risk_contribution', 'x_risk_decomposition']

@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/mutants/archbox/report/template_manager.py
+# hypothesis_version: 6.151.9
+
+[0.001, 0.01, 0.05, 0.1, '*', '**', '***', '.', '<0.001', 'FMT_NUMBER', 'FMT_PERCENT', 'FMT_PVALUE', 'HTML', 'MUTANT_UNDER_TEST', 'Mutant', 'SIGNIFICANCE_STARS', 'XXfmt_numberXX', 'XXfmt_percentXX', 'XXfmt_pvalueXX', 'XXhtmlXX', '__mutmut_', 'fail', 'fmt_number', 'fmt_percent', 'fmt_pvalue', 'html', 'significance_stars', 'stats', 'templates']

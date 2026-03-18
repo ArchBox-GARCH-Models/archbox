@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/mutants/archbox/utils/backend.py
+# hypothesis_version: 6.151.9
+
+['.', 'AUTO', 'MUTANT_UNDER_TEST', 'Mutant', 'NUMBA', 'PYTHON', 'XXautoXX', 'XXnumbaXX', 'XXpythonXX', '__mutmut_', 'auto', 'fail', 'numba', 'python', 'stats', 'x_get_backend', 'x_set_backend', 'x_use_numba']

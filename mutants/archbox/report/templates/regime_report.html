@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block sidebar %}
+<li><a href="#summary">Summary</a></li>
+<li><a href="#transition">Transition Matrix</a></li>
+<li><a href="#durations">Expected Durations</a></li>
+<li><a href="#regimes">Regime Classification</a></li>
+<li><a href="#charts">Charts</a></li>
+{% endblock %}
+
+{% block content %}
+<!-- Summary -->
+<h2 id="summary">Model Summary</h2>
+<div class="metric-grid">
+    <div class="metric-card">
+        <div class="metric-value">{{ model_name | default('MS-GARCH') }}</div>
+        <div class="metric-label">Model</div>
+    </div>
+    <div class="metric-card">
+        <div class="metric-value">{{ n_regimes | default(2) }}</div>
+        <div class="metric-label">Regimes</div>
+    </div>
+    <div class="metric-card">
+        <div class="metric-value">{{ n_obs | default(0) }}</div>
+        <div class="metric-label">Observations</div>
+    </div>
+    {% if loglikelihood is not none %}
+    <div class="metric-card">
+        <div class="metric-value">{{ loglikelihood | fmt_number(2) }}</div>
+        <div class="metric-label">Log-Likelihood</div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Transition Matrix -->
+<h2 id="transition">Transition Matrix</h2>
+{% if transition_matrix is defined %}
+<div class="card">
+    <table>
+        <thead>
+            <tr>
+                <th>From \ To</th>
+                {% for k in range(n_regimes) %}
+                <th>Regime {{ k + 1 }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for i in range(n_regimes) %}
+            <tr>
+                <td><strong>Regime {{ i + 1 }}</strong></td>
+                {% for j in range(n_regimes) %}
+                <td class="numeric">{{ transition_matrix[i][j] | fmt_number(4) }}</td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<!-- Expected Durations -->
+<h2 id="durations">Expected Durations</h2>
+{% if expected_durations is defined %}
+<div class="card">
+    <table>
+        <thead>
+            <tr><th>Regime</th><th>Expected Duration (obs)</th></tr>
+        </thead>
+        <tbody>
+            {% for d in expected_durations %}
+            <tr>
+                <td>Regime {{ d.regime }}</td>
+                <td class="numeric">{{ d.duration | fmt_number(1) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<!-- Regime Classification -->
+<h2 id="regimes">Regime Classification</h2>
+{% if regime_classification is defined %}
+<div class="card">
+    <div class="metric-grid">
+        {% for k in range(n_regimes) %}
+        <div class="metric-card">
+            <div class="metric-value">{{ regime_classification.proportions[k] | fmt_percent }}</div>
+            <div class="metric-label">Regime {{ k + 1 }} ({{ regime_classification.counts[k] }} obs)</div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Per-Regime Parameters -->
+{% if regime_params is defined %}
+<h2>Per-Regime Parameters</h2>
+{% for rp in regime_params %}
+<div class="card">
+    <div class="card-header">Regime {{ rp.regime }}</div>
+    <table>
+        <thead>
+            <tr><th>Parameter</th><th>Value</th></tr>
+        </thead>
+        <tbody>
+            {% for key, value in rp.params.items() %}
+            <tr>
+                <td>{{ key }}</td>
+                <td class="numeric">{{ value | fmt_number(6) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endfor %}
+{% endif %}
+
+<!-- Charts -->
+<h2 id="charts">Charts</h2>
+<div class="chart-container" id="regime-chart"></div>
+{% endblock %}

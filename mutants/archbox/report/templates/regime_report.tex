@@ -1,0 +1,48 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{booktabs}
+\usepackage[margin=2.5cm]{geometry}
+
+\title{ {{ title | default('Regime-Switching Report') }} }
+\author{archbox}
+\date{ {{ generated_at | default('') }} }
+
+\begin{document}
+\maketitle
+
+\section{Model Summary}
+Model: {{ model_name | default('MS-GARCH') }}, Regimes: {{ n_regimes | default(2) }}, Observations: {{ n_obs | default(0) }}
+
+{% if transition_matrix is defined %}
+\section{Transition Matrix}
+\begin{table}[htbp]
+\centering
+\begin{tabular}{ l{% for k in range(n_regimes) %}r{% endfor %} }
+\toprule
+From / To {% for k in range(n_regimes) %}& Regime {{ k+1 }} {% endfor %}\\
+\midrule
+{% for i in range(n_regimes) %}
+Regime {{ i+1 }} {% for j in range(n_regimes) %}& {{ transition_matrix[i][j] | fmt_number(4) }} {% endfor %}\\
+{% endfor %}
+\bottomrule
+\end{tabular}
+\end{table}
+{% endif %}
+
+{% if expected_durations is defined %}
+\section{Expected Durations}
+\begin{table}[htbp]
+\centering
+\begin{tabular}{lr}
+\toprule
+Regime & Duration (obs) \\
+\midrule
+{% for d in expected_durations %}
+Regime {{ d.regime }} & {{ d.duration | fmt_number(1) }} \\
+{% endfor %}
+\bottomrule
+\end{tabular}
+\end{table}
+{% endif %}
+
+\end{document}

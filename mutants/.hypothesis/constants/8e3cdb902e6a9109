@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/mutants/archbox/visualization/export.py
+# hypothesis_version: 6.151.9
+
+[150, 151, '.', 'MUTANT_UNDER_TEST', 'Mutant', 'PDF', 'PNG', 'SVG', 'TIGHT', 'XXpdfXX', 'XXpngXX', 'XXsvgXX', 'XXtightXX', '__mutmut_', 'fail', 'pdf', 'png', 'stats', 'svg', 'tight', 'x_export_html', 'x_export_pdf', 'x_export_png', 'x_export_svg']

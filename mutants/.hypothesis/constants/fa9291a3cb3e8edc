@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/mutants/archbox/report/transformers/__init__.py
+# hypothesis_version: 6.151.9
+
+['.', 'GARCHTransformer', 'MUTANT_UNDER_TEST', 'Mutant', 'RegimeTransformer', 'RiskTransformer', '__mutmut_', 'fail', 'stats']

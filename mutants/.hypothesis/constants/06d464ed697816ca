@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/mutants/archbox/threshold/transition.py
+# hypothesis_version: 6.151.9
+
+[-501.0, -500.0, -1.05, -0.05, 0.0, 0.05, 0.3, 0.5, 1.0, 1.05, 1.3, 1.5, 2.0, 2.05, 500.0, 501.0, '--', '.', 'EXPONENTIAL', 'G(S; GAMMA, C)', 'G(s; gamma, c)', 'GRAY', 'LOGISTIC', 'MUTANT_UNDER_TEST', 'Mutant', 'XX--XX', 'XXG(s; gamma, c)XX', 'XXexponentialXX', 'XXgrayXX', 'XXlogisticXX', '__mutmut_', 'exponential', 'fail', 'g(s; gamma, c)', 'gray', 'logistic', 'stats', 'x_plot_transition']

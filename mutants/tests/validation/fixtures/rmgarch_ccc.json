@@ -1,0 +1,19 @@
+{
+    "description": "CCC - rmgarch on FX synthetic data (3 series)",
+    "r_package": "rmgarch",
+    "r_version": "1.3-9",
+    "dataset": "fx_majors",
+    "model": "CCC",
+    "n_series": 3,
+    "constant_correlation": [
+        [1.0, 0.696, -0.259],
+        [0.696, 1.0, -0.172],
+        [-0.259, -0.172, 1.0]
+    ],
+    "loglikelihood": -59882504.6,
+    "tolerance": {
+        "correlation_abs": 0.05,
+        "loglike_abs": 2.0
+    },
+    "note": "Reference values from rmgarch CCC on archbox synthetic FX data"
+}

@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/mutants/archbox/threshold/tar.py
+# hypothesis_version: 6.151.9
+
+[-1.5, -0.5, 0.0, 0.15, 0.5, 0.85, 1.0, 1.15, 1.85, 300, 301, '.', 'C', 'MUTANT_UNDER_TEST', 'Mutant', 'REGIME_1', 'REGIME_2', 'TAR', 'XXcXX', 'XXregime_1XX', 'XXregime_2XX', '__mutmut_', 'c', 'fail', 'regime_1', 'regime_2', 'stats', 'xǁTARǁ__init__', 'xǁTARǁ_fit_cls']

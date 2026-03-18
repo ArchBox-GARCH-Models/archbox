@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/archbox/core/results.py
+# hypothesis_version: 6.151.9
+
+[-3.0, -2.0, 0.5, 0.7, 1.0, 2.0, 200, '-', '=', 'N(0,1)', 'Observation', 'Return', 'Returns', 'Volatility (sigma_t)', 'analytic', 'black', 'darkred', 'estimate', 'inf', 'p_value', 'q', 'r-', 'rb', 'residuals', 'std_err', 'steelblue', 't_value', 'variance', 'volatility', 'wb', 'z_t']

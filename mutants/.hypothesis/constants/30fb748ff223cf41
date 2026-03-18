@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/mutants/archbox/report/report_manager.py
+# hypothesis_version: 6.151.9
+
+[', ', '.', 'CSS', 'GARCH', 'HTML', 'MUTANT_UNDER_TEST', 'Mutant', 'PROFESSIONAL', 'REPORT_TYPE', 'THEME', 'TITLE', 'UTF-8', 'XX, XX', 'XXcssXX', 'XXgarchXX', 'XXhtmlXX', 'XXprofessionalXX', 'XXreport_typeXX', 'XXthemeXX', 'XXtitleXX', 'XXutf-8XX', '__mutmut_', 'css', 'fail', 'garch', 'html', 'latex', 'markdown', 'md', 'multivariate', 'professional', 'regime', 'report_type', 'risk', 'stats', 'tex', 'theme', 'title', 'utf-8']

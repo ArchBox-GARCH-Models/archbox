@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/mutants/archbox/report/exporters/html.py
+# hypothesis_version: 6.151.9
+
+['.', '</HEAD>', '</head>', '<SCRIPT', '<script', 'MUTANT_UNDER_TEST', 'Mutant', 'UTF-8', 'XX</head>XX', 'XX<scriptXX', 'XXutf-8XX', '__mutmut_', 'fail', 'stats', 'utf-8']

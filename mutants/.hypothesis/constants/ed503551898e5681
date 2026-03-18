@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/mutants/archbox/core/volatility_model.py
+# hypothesis_version: 6.151.9
+
+[0.0, 1e-12, 1.0, 1.000000000001, 2.0, 3.0, '.', 'CONSTANT', 'MLE', 'MUTANT_UNDER_TEST', 'Mutant', 'NORMAL', 'Unknown', 'XXconstantXX', 'XXmleXX', 'XXnormalXX', 'XXzeroXX', 'ZERO', '__mutmut_', 'constant', 'fail', 'mle', 'normal', 'stats', 'zero']

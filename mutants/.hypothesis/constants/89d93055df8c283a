@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/mutants/archbox/regime/ms_garch.py
+# hypothesis_version: 6.151.9
+
+[-1.5, -0.5, 0.0, 1e-12, 1e-08, 0.05, 0.1, 0.5, 0.85, 0.998, 0.999, 1.0, 1.000000000001, 1.00000001, 1.5, 1.998, 1.999, 2.0, 3.0, '.', 'ALPHA', 'BETA', 'GRAY', 'MS-GARCH', 'MUTANT_UNDER_TEST', 'Mutant', 'OMEGA', 'PERSISTENCE', 'XXalphaXX', 'XXbetaXX', 'XXgrayXX', 'XXomegaXX', 'XXpersistenceXX', '__mutmut_', 'alpha', 'beta', 'fail', 'gray', 'omega', 'persistence', 'stats']

@@ -94,7 +94,7 @@ def run_regime(args: argparse.Namespace) -> None:
         output["transition_matrix"] = results.transition_matrix.tolist()
     if hasattr(results, "regime_params"):
         output["regime_params"] = {
-            k: float(v) if isinstance(v, (int, float, np.floating)) else v
+            k: float(v) if isinstance(v, int | float | np.floating) else v
             for k, v in results.regime_params.items()
         }
 

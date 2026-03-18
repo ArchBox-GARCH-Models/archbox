@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/mutants/archbox/models/har_rv.py
+# hypothesis_version: 6.151.9
+
+[1.0, 2.0, '-', '.', '=', 'BETA_0', 'DAILY', 'MONTHLY', 'MUTANT_UNDER_TEST', 'Mutant', 'OLS', 'WEEKLY', 'XXbeta_0XX', 'XXdailyXX', 'XXmonthlyXX', 'XXolsXX', 'XXweeklyXX', '__mutmut_', 'beta_0', 'daily', 'fail', 'monthly', 'ols', 'stats', 'weekly', 'xǁHARRVǁ__init__', 'xǁHARRVǁfit']

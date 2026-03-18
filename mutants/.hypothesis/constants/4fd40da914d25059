@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/mutants/archbox/models/egarch.py
+# hypothesis_version: 6.151.9
+
+[-1.9999, -0.9999, -0.05, 0.0, 1e-12, 1e-06, 0.05, 0.1, 0.95, 0.9999, 1.0, 1.000000000001, 1.000001, 1.9999, 2.0, 3.0, '.', 'CONSTANT', 'EGARCH', 'MUTANT_UNDER_TEST', 'Mutant', 'NORMAL', 'XXconstantXX', 'XXnormalXX', '__mutmut_', 'constant', 'fail', 'normal', 'omega', 'stats', 'xǁEGARCHǁ__init__', 'xǁEGARCHǁbounds']

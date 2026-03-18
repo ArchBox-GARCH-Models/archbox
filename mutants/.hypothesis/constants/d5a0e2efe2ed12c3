@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/mutants/archbox/models/component_garch.py
+# hypothesis_version: 6.151.9
+
+[0.0, 1e-12, 1e-06, 0.001, 0.04, 0.05, 0.1, 0.98, 0.999, 1.0, 1.000000000001, 1.000001, 1.001, 1.999, 2.0, '.', 'CONSTANT', 'Component GARCH', 'MUTANT_UNDER_TEST', 'Mutant', 'NORMAL', 'XXconstantXX', 'XXnormalXX', '__mutmut_', 'alpha', 'alpha_p', 'beta', 'beta_p', 'constant', 'fail', 'normal', 'omega', 'stats']

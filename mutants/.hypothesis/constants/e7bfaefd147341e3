@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/mutants/archbox/diagnostics/hong_spillover.py
+# hypothesis_version: 6.151.9
+
+[0.0, 1e-20, 1.0, 2.0, '.', 'MUTANT_UNDER_TEST', 'Mutant', '__mutmut_', 'fail', 'stats', 'x__bartlett_kernel']

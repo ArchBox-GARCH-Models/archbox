@@ -1,0 +1,11 @@
+.hypothesis/
+__pycache__/
+*.pyc
+dist/
+*.egg-info/
+.mutmut-cache
+mutants/
+site/
+htmlcov/
+.coverage
+.pytest_cache/

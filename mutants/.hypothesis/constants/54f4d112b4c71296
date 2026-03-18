@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/mutants/archbox/diagnostics/sign_bias.py
+# hypothesis_version: 6.151.9
+
+['.', 'MUTANT_UNDER_TEST', 'Mutant', '__mutmut_', 'fail', 'stats', 'x_sign_bias_test']

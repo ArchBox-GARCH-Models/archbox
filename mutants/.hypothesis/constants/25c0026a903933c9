@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/mutants/archbox/distributions/ged.py
+# hypothesis_version: 6.151.9
+
+[-2.0, 0.0, 1e-06, 0.1, 0.5, 1.0, 1.000001, 1.1, 1.5, 2.0, 2.5, 3.0, 20.0, 21.0, '.', 'GED', 'MUTANT_UNDER_TEST', 'Mutant', '__mutmut_', 'fail', 'nu', 'stats']

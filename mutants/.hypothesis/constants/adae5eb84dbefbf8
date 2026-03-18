@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/mutants/archbox/threshold/__init__.py
+# hypothesis_version: 6.151.9
+
+['.', 'ESTAR', 'LSTAR', 'MUTANT_UNDER_TEST', 'Mutant', 'SETAR', 'TAR', 'TestResult', 'ThresholdModel', 'ThresholdResults', '__mutmut_', 'fail', 'linearity_test', 'logistic_transition', 'plot_transition', 'stats', 'transition_type_test', 'tsay_test']

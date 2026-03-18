@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/mutants/archbox/multivariate/utils.py
+# hypothesis_version: 6.151.9
+
+[0.0, 1e-08, 1.0, 1.00000001, 2.0, '.', 'MUTANT_UNDER_TEST', 'Mutant', '__mutmut_', 'fail', 'stats', 'x_corr_to_cov', 'x_cov_to_corr']

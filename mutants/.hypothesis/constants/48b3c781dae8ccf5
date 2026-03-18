@@ -1,0 +1,4 @@
+# file: /home/guhaase/projetos/archbox/mutants/archbox/report/transformers/regime.py
+# hypothesis_version: 6.151.9
+
+[1.0, 2.0, '.', 'AIC', 'BIC', 'COUNTS', 'DURATION', 'EXPECTED_DURATIONS', 'INF', 'LOGLIKELIHOOD', 'MARKOV-SWITCHING', 'MODEL_NAME', 'MUTANT_UNDER_TEST', 'Markov-Switching', 'Mutant', 'NOBS', 'N_OBS', 'N_REGIMES', 'PARAMS', 'PROPORTIONS', 'REGIME', 'REGIME_PARAMS', 'SMOOTHED_PROBS', 'TRANSITION_MATRIX', 'VALUE', 'XXMarkov-SwitchingXX', 'XXaicXX', 'XXbicXX', 'XXcountsXX', 'XXdurationXX', 'XXinfXX', 'XXloglikelihoodXX', 'XXmodel_nameXX', 'XXn_obsXX', 'XXn_regimesXX', 'XXnobsXX', 'XXparamsXX', 'XXproportionsXX', 'XXregimeXX', 'XXregime_paramsXX', 'XXsmoothed_probsXX', 'XXvalueXX', '__mutmut_', 'aic', 'bic', 'counts', 'duration', 'expected_durations', 'fail', 'inf', 'loglikelihood', 'markov-switching', 'model_name', 'n_obs', 'n_regimes', 'nobs', 'params', 'proportions', 'regime', 'regime_params', 'smoothed_probs', 'stats', 'transition_matrix', 'value']
