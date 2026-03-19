@@ -45,7 +45,7 @@ docs = [
 archbox = "archbox.cli.main:main"
 
 [tool.hatch.build.targets.sdist]
-exclude = ["logs/", "site/", "docs/", "tests/", ".github/"]
+exclude = ["logs/", "site/", "docs/", "tests/", ".github/", ".venv/"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["archbox"]
