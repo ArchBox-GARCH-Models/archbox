@@ -7,7 +7,6 @@ name = "garchbox"
 dynamic = ["version"]
 description = "ARCH/GARCH volatility models for financial time series"
 readme = "README.md"
-license = {text = "MIT"}
 requires-python = ">=3.11"
 authors = [
     { name = "NodesEcon" },
