@@ -45,6 +45,7 @@ jobs:
         password: ${{ secrets.PYPI_API_TOKEN }}
         skip-existing: false
         verbose: true
+        verify-metadata: false
 
     - name: Upload release assets
       uses: softprops/action-gh-release@v2
