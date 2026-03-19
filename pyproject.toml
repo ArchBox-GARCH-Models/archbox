@@ -3,7 +3,7 @@ requires = ["hatchling<1.22"]
 build-backend = "hatchling.build"
 
 [project]
-name = "archbox"
+name = "garchbox"
 dynamic = ["version"]
 description = "ARCH/GARCH volatility models for financial time series"
 readme = "README.md"
