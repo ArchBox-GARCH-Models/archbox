@@ -123,7 +123,7 @@ class APARCH(VolatilityModel):
         gammas = np.full(self.q, 0.0)
         betas = np.full(self.p, 0.90)
         delta = np.array([2.0])
-        return np.concatenate([[omega], alphas, gammas, betas, delta])
+        return np.concatenate([[omega], alphas, gammas, betas, delta], dtype=np.float64)
 
     @property
     def param_names(self) -> list[str]:

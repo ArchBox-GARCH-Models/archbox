@@ -261,7 +261,7 @@ class BEKK(MultivariateVolatilityModel):
         """
         sample_cov = np.cov(self.endog.T)
         try:
-            c_mat = np.linalg.cholesky(sample_cov * 0.05)
+            c_mat = np.linalg.cholesky(sample_cov * 0.05).astype(np.float64)
         except np.linalg.LinAlgError:
             c_mat = np.eye(self.k) * np.sqrt(0.05 * np.mean(np.diag(sample_cov)))
 

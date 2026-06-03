@@ -300,7 +300,7 @@ class MarkovSwitchingAR(MarkovSwitchingModel):
         try:
             xwx = x_mat.T @ w_mat @ x_mat
             xwy = x_mat.T @ w_mat @ y_dep
-            return np.linalg.solve(xwx + 1e-8 * np.eye(p), xwy)
+            return np.linalg.solve(xwx + 1e-8 * np.eye(p), xwy).astype(np.float64)
         except np.linalg.LinAlgError:
             return None
 

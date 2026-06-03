@@ -1,64 +1,36 @@
 site_name: ArchBox
-site_description: ARCH/GARCH volatility models for financial time series
-site_url: https://archbox.nodesecon.com
-repo_url: https://github.com/nodesecon/archbox
-repo_name: nodesecon/archbox
+site_description: Biblioteca de modelos ARCH/GARCH, volatilidade condicional, regime-switching e gestao de risco
+site_url: https://archbox.readthedocs.io
+repo_url: https://github.com/NodesEcon/archbox
+repo_name: NodesEcon/archbox
 
 theme:
   name: material
   palette:
     - scheme: default
-      primary: deep-orange
-      accent: orange
+      primary: deep purple
+      accent: amber
       toggle:
         icon: material/brightness-7
-        name: Switch to dark mode
+        name: Modo escuro
     - scheme: slate
-      primary: deep-orange
-      accent: orange
+      primary: deep purple
+      accent: amber
       toggle:
         icon: material/brightness-4
-        name: Switch to light mode
+        name: Modo claro
   features:
     - navigation.tabs
+    - navigation.tabs.sticky
     - navigation.sections
     - navigation.expand
     - navigation.top
-    - content.code.copy
-    - content.code.annotate
-    - search.highlight
     - search.suggest
-  icon:
-    repo: fontawesome/brands/github
-
-nav:
-  - Home: index.md
-  - Getting Started:
-    - Installation: getting-started/installation.md
-    - Quickstart: getting-started/quickstart.md
-    - Key Concepts: getting-started/key-concepts.md
-  - User Guide:
-    - GARCH: user-guide/garch.md
-    - EGARCH: user-guide/egarch.md
-    - GJR-GARCH: user-guide/gjr.md
-    - Multivariate: user-guide/multivariate.md
-    - Regime-Switching: user-guide/regime.md
-    - Threshold/STAR: user-guide/threshold.md
-    - Risk Management: user-guide/risk.md
-    - Distributions: user-guide/distributions.md
-  - API Reference:
-    - Core: api/core.md
-    - Models: api/models.md
-    - Multivariate: api/multivariate.md
-    - Regime: api/regime.md
-    - Risk: api/risk.md
-    - Diagnostics: api/diagnostics.md
-  - Theory:
-    - GARCH Models: theory/garch-theory.md
-    - Multivariate GARCH: theory/multivariate-theory.md
-    - Regime-Switching: theory/regime-theory.md
-    - Risk Measures: theory/risk-theory.md
-  - Benchmarks: benchmarks/performance.md
+    - search.highlight
+    - content.code.copy
+    - content.tabs.link
+  logo: assets/images/logo.svg
+  favicon: assets/images/logo.svg
 
 plugins:
   - search
@@ -66,33 +38,172 @@ plugins:
       handlers:
         python:
           options:
-            show_source: false
             docstring_style: numpy
+            show_source: true
             show_root_heading: true
-            show_root_full_path: false
-            members_order: source
 
 markdown_extensions:
-  - pymdownx.highlight:
-      anchor_linenums: true
-  - pymdownx.superfences
-  - pymdownx.tabbed:
-      alternate_style: true
   - pymdownx.arithmatex:
       generic: true
-  - admonition
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
   - pymdownx.details
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - admonition
   - attr_list
   - md_in_html
-  - tables
   - toc:
       permalink: true
 
 extra_javascript:
-  - https://polyfill.io/v3/polyfill.min.js?features=es6
+  - javascripts/mathjax.js
   - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
 
+extra_css:
+  - stylesheets/extra.css
+
 extra:
+  version:
+    provider: mike
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/nodesecon/archbox
+      link: https://github.com/NodesEcon/archbox
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - getting-started/index.md
+    - Instalacao: getting-started/installation.md
+    - Quick Start: getting-started/quickstart.md
+    - Conceitos Fundamentais: getting-started/core-concepts.md
+    - Escolhendo um Modelo: getting-started/choosing-model.md
+  - User Guide:
+    - user-guide/index.md
+    - GARCH Univariado:
+      - user-guide/garch/index.md
+      - GARCH(p,q): user-guide/garch/garch.md
+      - EGARCH: user-guide/garch/egarch.md
+      - GJR-GARCH: user-guide/garch/gjr-garch.md
+      - APARCH: user-guide/garch/aparch.md
+      - FIGARCH: user-guide/garch/figarch.md
+      - IGARCH: user-guide/garch/igarch.md
+      - GARCH-M: user-guide/garch/garch-m.md
+      - Component GARCH: user-guide/garch/component.md
+      - HAR-RV: user-guide/garch/har-rv.md
+    - Distribuicoes:
+      - user-guide/distributions/index.md
+      - Normal: user-guide/distributions/normal.md
+      - Student-t: user-guide/distributions/student-t.md
+      - Skewed-t: user-guide/distributions/skewed-t.md
+      - GED: user-guide/distributions/ged.md
+      - Skewed GED: user-guide/distributions/skewed-ged.md
+      - Guia de Selecao: user-guide/distributions/choosing.md
+    - Multivariado:
+      - user-guide/multivariate/index.md
+      - DCC: user-guide/multivariate/dcc.md
+      - BEKK: user-guide/multivariate/bekk.md
+      - CCC: user-guide/multivariate/ccc.md
+      - GO-GARCH: user-guide/multivariate/go-garch.md
+      - DECO: user-guide/multivariate/deco.md
+      - Diagnosticos: user-guide/multivariate/diagnostics.md
+      - Guia de Selecao: user-guide/multivariate/choosing-model.md
+    - Regime-Switching:
+      - user-guide/regime-switching/index.md
+      - MS-AR: user-guide/regime-switching/ms-ar.md
+      - MS-VAR: user-guide/regime-switching/ms-var.md
+      - MS-GARCH: user-guide/regime-switching/ms-garch.md
+      - Hamilton Filter: user-guide/regime-switching/hamilton-filter.md
+      - Estimacao: user-guide/regime-switching/estimation.md
+      - Diagnosticos: user-guide/regime-switching/diagnostics.md
+    - Threshold/STAR:
+      - user-guide/threshold/index.md
+      - TAR: user-guide/threshold/tar.md
+      - SETAR: user-guide/threshold/setar.md
+      - LSTAR: user-guide/threshold/lstar.md
+      - ESTAR: user-guide/threshold/estar.md
+      - Testes de Linearidade: user-guide/threshold/linearity-tests.md
+    - Gestao de Risco:
+      - user-guide/risk/index.md
+      - VaR: user-guide/risk/var.md
+      - Expected Shortfall: user-guide/risk/es.md
+      - EWMA: user-guide/risk/ewma.md
+      - Backtesting: user-guide/risk/backtesting.md
+      - Diagnosticos: user-guide/risk/diagnostics.md
+    - ArchExperiment: user-guide/experiment.md
+  - Theory:
+    - theory/garch-theory.md
+    - theory/multivariate-theory.md
+    - theory/regime-switching-theory.md
+    - theory/threshold-theory.md
+    - theory/risk-theory.md
+    - theory/distributions-theory.md
+    - theory/references.md
+  - Diagnostics:
+    - diagnostics/index.md
+    - Ljung-Box: diagnostics/ljung-box.md
+    - ARCH-LM: diagnostics/arch-lm.md
+    - Jarque-Bera: diagnostics/jarque-bera.md
+    - Kolmogorov-Smirnov: diagnostics/kolmogorov-smirnov.md
+    - Criterios de Informacao: diagnostics/information-criteria.md
+    - Likelihood Ratio: diagnostics/likelihood-ratio.md
+    - Sign Bias: diagnostics/sign-bias.md
+    - News Impact: diagnostics/news-impact.md
+    - Persistencia: diagnostics/persistence.md
+    - Avaliacao de Previsao: diagnostics/forecast-evaluation.md
+  - Tutorials:
+    - tutorials/index.md
+    - Fundamentos: tutorials/fundamentals.md
+    - Variantes GARCH: tutorials/garch-variants.md
+    - Multivariado: tutorials/multivariate.md
+    - Regime-Switching: tutorials/regime-switching.md
+    - Gestao de Risco: tutorials/risk-management.md
+    - Threshold/STAR: tutorials/threshold.md
+    - HAR-RV: tutorials/har-realized.md
+    - Workflow Completo: tutorials/complete-workflow.md
+  - Visualization:
+    - visualization/index.md
+    - Volatilidade: visualization/volatility-plots.md
+    - Correlacao: visualization/correlation-plots.md
+    - Risco: visualization/risk-plots.md
+    - Regimes: visualization/regime-plots.md
+    - Diagnosticos: visualization/diagnostic-plots.md
+    - Temas: visualization/themes.md
+  - API Reference:
+    - api/index.md
+    - Core: api/core.md
+    - GARCH: api/garch.md
+    - HAR: api/har.md
+    - Multivariado: api/multivariate.md
+    - Regime-Switching: api/regime-switching.md
+    - Threshold: api/threshold.md
+    - Distribuicoes: api/distributions.md
+    - Risco: api/risk.md
+    - Diagnosticos: api/diagnostics.md
+    - Visualizacao: api/visualization.md
+    - Reports: api/reports.md
+    - Experiment: api/experiment.md
+    - Datasets: api/datasets.md
+    - CLI: api/cli.md
+  - FAQ:
+    - faq/general.md
+    - faq/advanced.md
+    - faq/troubleshooting.md
+  - Benchmarks:
+    - benchmarks/index.md
+    - GARCH: benchmarks/garch.md
+    - Multivariado: benchmarks/multivariate.md
+    - Risco: benchmarks/risk.md
+    - Comparacao: benchmarks/comparison.md
+  - Contributing:
+    - contributing/contributing.md
+    - contributing/code-of-conduct.md
+    - contributing/changelog.md
+    - contributing/roadmap.md

@@ -166,7 +166,7 @@ class ESTAR(ThresholdModel):
         x2 = x_mat * g[:, np.newaxis]
         x_full = np.hstack([x1, x2])
 
-        beta = np.linalg.lstsq(x_full, y, rcond=None)[0]
+        beta = np.linalg.lstsq(x_full, y, rcond=None)[0].astype(np.float64)
         resid = y - x_full @ beta
         rss = float(np.sum(resid**2))
         return beta, resid, rss

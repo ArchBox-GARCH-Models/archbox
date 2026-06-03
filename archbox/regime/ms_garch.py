@@ -173,13 +173,15 @@ class MarkovSwitchingGARCH(MarkovSwitchingModel):
         """
         if self._sigma2 is None:
             return
+        sigma2 = self._sigma2
 
         n_obs, k = filtered_probs.shape
-        self._h_collapsed = np.zeros(n_obs)
+        h_collapsed = np.zeros(n_obs)
         for t in range(n_obs):
             for s in range(k):
-                self._h_collapsed[t] += filtered_probs[t, s] * self._sigma2[t, s]
-            self._h_collapsed[t] = max(self._h_collapsed[t], 1e-12)
+                h_collapsed[t] += filtered_probs[t, s] * sigma2[t, s]
+            h_collapsed[t] = max(h_collapsed[t], 1e-12)
+        self._h_collapsed = h_collapsed
 
         self._filtered_probs_cache = filtered_probs.copy()
 

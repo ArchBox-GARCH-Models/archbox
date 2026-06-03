@@ -1,4 +1,0 @@
-# file: /home/guhaase/projetos/archbox/archbox/models/__init__.py
-# hypothesis_version: 6.151.9
-
-['APARCH', 'ComponentGARCH', 'EGARCH', 'FIGARCH', 'GARCH', 'GARCHM', 'GJRGARCH', 'HARRV', 'IGARCH']

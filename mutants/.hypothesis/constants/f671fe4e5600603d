@@ -1,4 +1,0 @@
-# file: /home/guhaase/projetos/archbox/mutants/archbox/core/__init__.py
-# hypothesis_version: 6.151.9
-
-['.', 'ArchBoxError', 'ArchResults', 'ConvergenceError', 'MUTANT_UNDER_TEST', 'Mutant', 'StationarityError', 'ValidationError', 'VolatilityModel', '__mutmut_', 'fail', 'stats']

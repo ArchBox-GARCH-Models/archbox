@@ -130,7 +130,7 @@ class GJRGARCH(VolatilityModel):
         alphas = np.full(self.q, 0.05)
         gammas = np.full(self.q, 0.04)
         betas = np.full(self.p, 0.90)
-        return np.concatenate([[omega], alphas, gammas, betas])
+        return np.concatenate([[omega], alphas, gammas, betas], dtype=np.float64)
 
     @property
     def param_names(self) -> list[str]:

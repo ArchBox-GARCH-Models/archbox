@@ -1,4 +1,0 @@
-# file: /home/guhaase/projetos/archbox/archbox/experiment/__init__.py
-# hypothesis_version: 6.151.9
-
-['ArchExperiment', 'ComparisonResult', 'RiskAnalysisResult', 'ValidationResult']

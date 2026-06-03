@@ -1,4 +1,0 @@
-# file: /home/guhaase/projetos/archbox/archbox/report/transformers/__init__.py
-# hypothesis_version: 6.151.9
-
-['GARCHTransformer', 'RegimeTransformer', 'RiskTransformer']

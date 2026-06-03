@@ -203,7 +203,7 @@ class GARCHM(VolatilityModel):
         alphas = np.full(self.q, 0.05)
         betas = np.full(self.p, 0.90)
         lam = np.array([0.01])
-        return np.concatenate([[omega], alphas, betas, lam])
+        return np.concatenate([[omega], alphas, betas, lam], dtype=np.float64)
 
     @property
     def param_names(self) -> list[str]:

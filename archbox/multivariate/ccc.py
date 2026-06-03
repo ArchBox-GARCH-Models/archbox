@@ -84,7 +84,7 @@ class CCC(MultivariateVolatilityModel):
         n_obs, k = std_resids.shape
 
         # Compute sample correlation of standardized residuals
-        corr = np.corrcoef(std_resids.T)  # (k, k)
+        corr = np.asarray(np.corrcoef(std_resids.T), dtype=np.float64)  # (k, k)
 
         # Ensure positive definite
         eigenvalues = np.linalg.eigvalsh(corr)

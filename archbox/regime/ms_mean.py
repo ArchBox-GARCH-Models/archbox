@@ -113,7 +113,7 @@ class MarkovSwitchingMean(MarkovSwitchingModel):
         # Transition params (k*(k-1) logit values, initialized to 0 = p=0.5)
         trans = np.zeros(k * (k - 1))
 
-        return np.concatenate([mus, sigma, trans])
+        return np.concatenate([mus, sigma, trans], dtype=np.float64)
 
     @property
     def param_names(self) -> list[str]:
@@ -275,7 +275,7 @@ class MarkovSwitchingMeanVar(MarkovSwitchingModel):
         # Transition params
         trans = np.zeros(k * (k - 1))
 
-        return np.concatenate([mus, sigmas, trans])
+        return np.concatenate([mus, sigmas, trans], dtype=np.float64)
 
     @property
     def param_names(self) -> list[str]:

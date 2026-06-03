@@ -89,7 +89,7 @@ def engle_sheppard_test(
         raise ValueError(msg)
 
     # Sample correlation matrix
-    r_corr = np.corrcoef(resids.T)
+    r_corr = np.asarray(np.corrcoef(resids.T), dtype=np.float64)
 
     # Collect LM statistics across all pairs
     total_lm = 0.0

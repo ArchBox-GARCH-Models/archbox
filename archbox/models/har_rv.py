@@ -175,7 +175,7 @@ class HARRV:
             # OLS: beta = (X'X)^{-1} X'y
             xtx = x_mat.T @ x_mat
             xty = x_mat.T @ y
-            beta = np.linalg.solve(xtx, xty)
+            beta = np.linalg.solve(xtx, xty).astype(np.float64)
 
             # Residuals and fitted values
             fitted = x_mat @ beta

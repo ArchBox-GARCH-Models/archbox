@@ -380,7 +380,7 @@ class ThresholdModel(ABC):
         rss : float
             Residual sum of squares.
         """
-        beta = np.linalg.lstsq(x_mat, y, rcond=None)[0]
+        beta = np.linalg.lstsq(x_mat, y, rcond=None)[0].astype(np.float64)
         resid = y - x_mat @ beta
         rss = float(np.sum(resid**2))
         return beta, resid, rss

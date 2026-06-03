@@ -1,0 +1,203 @@
+/* Custom styles for ArchBox documentation */
+
+/* Header customization */
+.md-header {
+    box-shadow: 0 0 0.2rem rgba(0, 0, 0, 0.1), 0 0.2rem 0.4rem rgba(0, 0, 0, 0.2);
+}
+
+/* Logo sizing */
+.md-header__button.md-logo img,
+.md-header__button.md-logo svg {
+    width: 2.4rem !important;
+    height: 2.4rem !important;
+}
+
+/* Code block enhancements */
+.highlight pre {
+    padding: 1em;
+    border-radius: 0.4em;
+}
+
+.highlight code {
+    font-size: 0.85em;
+    line-height: 1.6;
+}
+
+/* Inline code */
+code {
+    padding: 0.2em 0.4em;
+    border-radius: 0.2em;
+    background-color: var(--md-code-bg-color);
+}
+
+/* Table styling */
+table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1em 0;
+}
+
+table th {
+    background-color: var(--md-primary-fg-color);
+    color: var(--md-primary-bg-color);
+    font-weight: 600;
+    padding: 0.6em 1em;
+}
+
+table td {
+    padding: 0.6em 1em;
+    border-bottom: 1px solid var(--md-default-fg-color--lightest);
+}
+
+table tr:hover td {
+    background-color: var(--md-default-fg-color--lightest);
+}
+
+/* Admonition customization */
+.admonition {
+    margin: 1.5em 0;
+    border-radius: 0.3em;
+}
+
+/* Custom admonition: volatility */
+.md-typeset .admonition.volatility,
+.md-typeset details.volatility {
+    border-color: #7c4dff;
+}
+
+.md-typeset .volatility > .admonition-title,
+.md-typeset .volatility > summary {
+    background-color: rgba(124, 77, 255, 0.1);
+}
+
+.md-typeset .volatility > .admonition-title::before,
+.md-typeset .volatility > summary::before {
+    background-color: #7c4dff;
+    -webkit-mask-image: var(--md-admonition-icon--example);
+    mask-image: var(--md-admonition-icon--example);
+}
+
+/* Custom admonition: financial */
+.md-typeset .admonition.financial,
+.md-typeset details.financial {
+    border-color: #ffc107;
+}
+
+.md-typeset .financial > .admonition-title,
+.md-typeset .financial > summary {
+    background-color: rgba(255, 193, 7, 0.1);
+}
+
+.md-typeset .financial > .admonition-title::before,
+.md-typeset .financial > summary::before {
+    background-color: #ffc107;
+    -webkit-mask-image: var(--md-admonition-icon--tip);
+    mask-image: var(--md-admonition-icon--tip);
+}
+
+/* Math rendering improvements */
+.MathJax {
+    font-size: 1.1em !important;
+}
+
+.MathJax_Display {
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0.5em 0;
+}
+
+/* Dark mode adjustments */
+[data-md-color-scheme="slate"] .md-header__button.md-logo img,
+[data-md-color-scheme="slate"] .md-header__button.md-logo svg {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 0.3rem;
+}
+
+[data-md-color-scheme="slate"] table th {
+    background-color: var(--md-primary-fg-color--dark);
+}
+
+/* Navigation improvements */
+.md-nav__item--active > .md-nav__link {
+    font-weight: 600;
+}
+
+/* API documentation spacing */
+.doc-contents {
+    margin-top: 1em;
+}
+
+.doc-heading code {
+    background-color: transparent;
+    font-size: 0.9em;
+}
+
+/* Parameter tables in API docs */
+.field-list dt {
+    font-weight: 600;
+    color: var(--md-primary-fg-color);
+}
+
+.field-list dd {
+    margin-left: 2em;
+    margin-bottom: 0.5em;
+}
+
+/* Heading anchor visibility */
+.headerlink {
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+h1:hover .headerlink,
+h2:hover .headerlink,
+h3:hover .headerlink,
+h4:hover .headerlink {
+    opacity: 1;
+}
+
+/* Search results */
+.md-search-result__teaser {
+    max-height: 4em;
+    overflow: hidden;
+}
+
+/* Custom badges */
+.badge {
+    display: inline-block;
+    padding: 0.25em 0.5em;
+    font-size: 0.75em;
+    font-weight: 600;
+    line-height: 1;
+    text-align: center;
+    white-space: nowrap;
+    vertical-align: baseline;
+    border-radius: 0.25rem;
+}
+
+.badge-stable {
+    background-color: #28a745;
+    color: white;
+}
+
+.badge-beta {
+    background-color: #ffc107;
+    color: #212529;
+}
+
+.badge-experimental {
+    background-color: #dc3545;
+    color: white;
+}
+
+/* Footer */
+.md-footer-meta {
+    background-color: var(--md-footer-bg-color);
+}
+
+/* Docstring section titles */
+.doc-section-title {
+    font-weight: 600;
+    margin-top: 1em;
+    margin-bottom: 0.5em;
+}

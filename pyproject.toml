@@ -35,9 +35,10 @@ dev = [
     "pyright>=1.1",
 ]
 docs = [
-    "mkdocs>=1.5",
-    "mkdocs-material>=9.0",
+    "mkdocs-material>=9.5",
     "mkdocstrings[python]>=0.24",
+    "pymdown-extensions>=10.7",
+    "mike>=2.0",
 ]
 
 [project.scripts]
@@ -83,6 +84,10 @@ ignore = ["N806", "N802"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["N806"]
+# Example/tutorial scripts: re-exports in __init__, long lines for readability,
+# imports after sys.path setup, and math-convention argument names are expected.
+"examples/**/__init__.py" = ["F401"]
+"examples/**" = ["E402", "E501", "N803"]
 
 [tool.pyright]
 pythonVersion = "3.11"
