@@ -83,7 +83,7 @@ We start with the workhorse model for risk management -- GARCH(1,1) with Student
 from archbox import GARCH
 
 # Estimate GARCH(1,1) with Student-t
-model = GARCH(returns, p=1, q=1, dist="studentt")
+model = GARCH(returns, p=1, q=1, dist="student-t")
 results = model.fit(disp=True)
 
 print(results.summary())
@@ -358,7 +358,7 @@ while t < len(returns):
     train = returns[:t]
 
     # Fit GARCH(1,1) with Student-t
-    model_roll = GARCH(train, p=1, q=1, dist="studentt")
+    model_roll = GARCH(train, p=1, q=1, dist="student-t")
     results_roll = model_roll.fit(disp=False)
 
     # Determine forecast period

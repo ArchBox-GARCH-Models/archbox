@@ -305,7 +305,7 @@ Lower $\nu$ means fatter tails. As $\nu \to \infty$, the Student-t converges to 
 
 ```python
 # Estimate GARCH(1,1) with Student-t innovations
-model_t = GARCH(returns, p=1, q=1, dist="studentt")
+model_t = GARCH(returns, p=1, q=1, dist="student-t")
 results_t = model_t.fit(disp=True)
 
 print(results_t.summary())

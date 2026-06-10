@@ -212,7 +212,7 @@ from archbox.datasets import load_dataset
 returns = load_dataset("sp500")["returns"].to_numpy()
 
 # GARCH(1,1) with Student-t distribution
-model = GARCH(returns, p=1, q=1, dist="t")
+model = GARCH(returns, p=1, q=1, dist="student-t")
 results = model.fit()
 
 # VaR and ES at 1% level (Basel requirement)
@@ -421,7 +421,7 @@ print(f"Sign Bias p-value: {sb.pvalue:.4f}")
     If the ARCH-LM test rejects (p < 0.05), try a higher-order model or a different specification. If the Sign Bias test rejects, switch from a symmetric model (GARCH) to an asymmetric one (EGARCH, GJR-GARCH). If normality is rejected even with standardized residuals, consider using a **Student-t** or **Skewed-t** distribution:
 
     ```python
-    model = GARCH(returns, p=1, q=1, dist="skewt")
+    model = GARCH(returns, p=1, q=1, dist="skewed-t")
     results = model.fit()
     ```
 

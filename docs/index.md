@@ -10,8 +10,8 @@ description: Python library for ARCH/GARCH models, regime-switching, threshold/S
 **The complete Python toolkit for conditional volatility modeling.**
 
 [![CI](https://github.com/NodesEcon/archbox/actions/workflows/tests.yml/badge.svg)](https://github.com/NodesEcon/archbox/actions/workflows/tests.yml)
-[![PyPI](https://img.shields.io/pypi/v/archbox)](https://pypi.org/project/archbox/)
-[![Python](https://img.shields.io/pypi/pyversions/archbox)](https://pypi.org/project/archbox/)
+[![PyPI](https://img.shields.io/pypi/v/garchbox)](https://pypi.org/project/garchbox/)
+[![Python](https://img.shields.io/pypi/pyversions/garchbox)](https://pypi.org/project/garchbox/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 ![Development Status](https://img.shields.io/badge/development%20status-alpha-orange)
 
@@ -169,15 +169,17 @@ Each library follows the same design philosophy: **scikit-learn-inspired API**, 
 ## Installation
 
 ```bash
-pip install archbox
+pip install garchbox
 ```
+
+> The PyPI distribution is named `garchbox`; the import name is `archbox`. Run `pip install garchbox`, then `import archbox`.
 
 With optional extras:
 
 ```bash
-pip install archbox[dev]     # Development tools
-pip install archbox[docs]    # Documentation tools
-pip install archbox[test]    # Testing tools
+pip install garchbox[dev]     # Development tools
+pip install garchbox[docs]    # Documentation tools
+pip install garchbox[test]    # Testing tools
 ```
 
 See the [Installation Guide](getting-started/installation.md) for detailed instructions.

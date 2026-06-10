@@ -663,7 +663,7 @@ Portfolio Statistics:
 
 ```python
 # Fit GARCH on portfolio returns for VaR
-model_port = GARCH(port_returns, p=1, q=1, dist="studentt")
+model_port = GARCH(port_returns, p=1, q=1, dist="student-t")
 results_port = model_port.fit(disp=False)
 
 # Compute VaR 95% and 99%

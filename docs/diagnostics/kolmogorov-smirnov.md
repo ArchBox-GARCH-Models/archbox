@@ -225,7 +225,7 @@ result_n = model_n.fit()
 z_n = result_n.std_resids
 
 # Fit with Student-t distribution
-model_t = GARCH(returns, p=1, q=1, dist="t")
+model_t = GARCH(returns, p=1, q=1, dist="student-t")
 result_t = model_t.fit()
 z_t = result_t.std_resids
 nu = result_t.params['nu']

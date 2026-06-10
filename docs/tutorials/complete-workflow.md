@@ -288,9 +288,9 @@ from archbox.models import EGARCH, GJR
 
 # Model specifications to test
 model_specs = {
-    "GARCH(1,1)": lambda r: GARCH(r, p=1, q=1, dist="studentt"),
-    "EGARCH(1,1)": lambda r: EGARCH(r, p=1, q=1, dist="studentt"),
-    "GJR(1,1)": lambda r: GJR(r, p=1, q=1, dist="studentt"),
+    "GARCH(1,1)": lambda r: GARCH(r, p=1, q=1, dist="student-t"),
+    "EGARCH(1,1)": lambda r: EGARCH(r, p=1, q=1, dist="student-t"),
+    "GJR(1,1)": lambda r: GJR(r, p=1, q=1, dist="student-t"),
 }
 
 # Fit all models for all assets

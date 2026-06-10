@@ -74,15 +74,15 @@ sp500 = load_dataset("sp500")
 returns = sp500["returns"].to_numpy()
 
 # Fit GARCH(1,1)
-model_garch = GARCH(returns, p=1, q=1, dist="studentt")
+model_garch = GARCH(returns, p=1, q=1, dist="student-t")
 results_garch = model_garch.fit(disp=False)
 
 # Fit EGARCH(1,1)
-model_egarch = EGARCH(returns, p=1, q=1, dist="studentt")
+model_egarch = EGARCH(returns, p=1, q=1, dist="student-t")
 results_egarch = model_egarch.fit(disp=False)
 
 # Fit GJR-GARCH(1,1)
-model_gjr = GJRGARCH(returns, p=1, q=1, dist="studentt")
+model_gjr = GJRGARCH(returns, p=1, q=1, dist="student-t")
 results_gjr = model_gjr.fit(disp=False)
 
 print("All models converged successfully!")
@@ -385,9 +385,9 @@ exp.add_model(ab.EGARCH(1, 1))
 exp.add_model(ab.GJR(1, 1))
 
 # Student-t distribution models
-exp.add_model(ab.GARCH(1, 1), dist="studentt")
-exp.add_model(ab.EGARCH(1, 1), dist="studentt")
-exp.add_model(ab.GJR(1, 1), dist="studentt")
+exp.add_model(ab.GARCH(1, 1), dist="student-t")
+exp.add_model(ab.EGARCH(1, 1), dist="student-t")
+exp.add_model(ab.GJR(1, 1), dist="student-t")
 
 # Run and compare
 exp.run()

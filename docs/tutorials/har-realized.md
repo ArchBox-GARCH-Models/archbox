@@ -509,7 +509,7 @@ for t in range(T_oos):
     rv_expanding = np.append(rv_expanding, rv_oos[t])
 
 # === GARCH(1,1) forecasts ===
-garch_model = GARCH(ret_is, p=1, q=1, dist="studentt")
+garch_model = GARCH(ret_is, p=1, q=1, dist="student-t")
 garch_results = garch_model.fit(disp=False)
 
 garch_forecasts = np.zeros(T_oos)

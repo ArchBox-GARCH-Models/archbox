@@ -140,12 +140,12 @@ exp = ab.ArchExperiment(returns)
 
 # Mesmo modelo, diferentes distribuicoes
 exp.add_model(ab.GARCH(1, 1, dist='normal'), name='GARCH-N')
-exp.add_model(ab.GARCH(1, 1, dist='studentt'), name='GARCH-t')
+exp.add_model(ab.GARCH(1, 1, dist='student-t'), name='GARCH-t')
 exp.add_model(ab.GARCH(1, 1, dist='ged'), name='GARCH-GED')
 
 # Modelos assimetricos com Student-t
-exp.add_model(ab.EGARCH(1, 1, dist='studentt'), name='EGARCH-t')
-exp.add_model(ab.GJR(1, 1, dist='studentt'), name='GJR-t')
+exp.add_model(ab.EGARCH(1, 1, dist='student-t'), name='EGARCH-t')
+exp.add_model(ab.GJR(1, 1, dist='student-t'), name='GJR-t')
 
 exp.run()
 exp.summary()
@@ -331,14 +331,14 @@ exp = ab.ArchExperiment(returns, alpha=0.01)
 
 # Modelos simetricos
 exp.add_model(ab.GARCH(1, 1, dist='normal'), name='GARCH(1,1)-N')
-exp.add_model(ab.GARCH(1, 1, dist='studentt'), name='GARCH(1,1)-t')
-exp.add_model(ab.GARCH(2, 1, dist='studentt'), name='GARCH(2,1)-t')
+exp.add_model(ab.GARCH(1, 1, dist='student-t'), name='GARCH(1,1)-t')
+exp.add_model(ab.GARCH(2, 1, dist='student-t'), name='GARCH(2,1)-t')
 
 # Modelos assimetricos
 exp.add_model(ab.EGARCH(1, 1, dist='normal'), name='EGARCH(1,1)-N')
-exp.add_model(ab.EGARCH(1, 1, dist='studentt'), name='EGARCH(1,1)-t')
+exp.add_model(ab.EGARCH(1, 1, dist='student-t'), name='EGARCH(1,1)-t')
 exp.add_model(ab.GJR(1, 1, dist='normal'), name='GJR(1,1)-N')
-exp.add_model(ab.GJR(1, 1, dist='studentt'), name='GJR(1,1)-t')
+exp.add_model(ab.GJR(1, 1, dist='student-t'), name='GJR(1,1)-t')
 
 # =====================================================
 # 3. Executar (estimacao paralela)

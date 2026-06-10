@@ -26,7 +26,7 @@ results = model.fit()
 ## With Student-t distribution
 
 ```python
-model = GARCH(returns, p=1, q=1, dist='studentt')
+model = GARCH(returns, p=1, q=1, dist='student-t')
 results = model.fit()
 ```
 

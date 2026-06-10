@@ -18,10 +18,10 @@ from archbox import GARCH
 model = GARCH(returns, p=1, q=1, dist='normal')
 
 # Student-t
-model = GARCH(returns, p=1, q=1, dist='studentt')
+model = GARCH(returns, p=1, q=1, dist='student-t')
 
 # Skewed-t
-model = GARCH(returns, p=1, q=1, dist='skewt')
+model = GARCH(returns, p=1, q=1, dist='skewed-t')
 
 # GED
 model = GARCH(returns, p=1, q=1, dist='ged')

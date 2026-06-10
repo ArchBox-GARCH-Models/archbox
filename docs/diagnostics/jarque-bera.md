@@ -143,7 +143,7 @@ The Jarque-Bera test is most useful when the model is estimated under **normalit
 
     ```python
     # If JB rejects, re-estimate with Student-t
-    model_t = GARCH(returns, p=1, q=1, dist="t")
+    model_t = GARCH(returns, p=1, q=1, dist="student-t")
     result_t = model_t.fit()
     ```
 

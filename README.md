@@ -5,6 +5,14 @@ ARCH/GARCH volatility models for financial time series.
 ## Installation
 
 ```bash
+pip install garchbox
+```
+
+The PyPI distribution is named `garchbox`; the import name is `archbox`.
+
+For development:
+
+```bash
 pip install -e ".[dev]"
 ```
 
