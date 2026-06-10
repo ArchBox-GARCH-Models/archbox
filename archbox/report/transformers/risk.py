@@ -46,7 +46,7 @@ class RiskTransformer:
         )
 
         # VaR/ES summary statistics
-        if hasattr(results, "var"):
+        if hasattr(results, "var") and not callable(results.var):
             var = np.asarray(results.var)
             context["var_stats"] = {
                 "mean": float(np.mean(var)),
@@ -55,7 +55,7 @@ class RiskTransformer:
                 "max": float(np.max(var)),
             }
 
-        if hasattr(results, "es") and results.es is not None:
+        if hasattr(results, "es") and not callable(results.es) and results.es is not None:
             es = np.asarray(results.es)
             context["es_stats"] = {
                 "mean": float(np.mean(es)),
