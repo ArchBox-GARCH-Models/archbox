@@ -71,13 +71,44 @@ class VolatilityModel(ABC):
 
     @staticmethod
     def _build_distribution(dist: str) -> Distribution:
-        """Build a distribution instance from name."""
+        """Build a distribution instance from a (possibly aliased) name."""
+        from archbox.distributions.ged import GeneralizedError
+        from archbox.distributions.mixture_normal import MixtureNormal
         from archbox.distributions.normal import Normal
+        from archbox.distributions.skewed_t import SkewedT
+        from archbox.distributions.student_t import StudentT
 
-        if dist == "normal":
-            return Normal()
-        msg = f"Unknown distribution: {dist}. Available: 'normal'."
-        raise ValueError(msg)
+        normalized = dist.strip().lower().replace("_", "-").replace(" ", "-")
+
+        mapping: dict[str, type[Distribution]] = {
+            "normal": Normal,
+            "gaussian": Normal,
+            "norm": Normal,
+            "student-t": StudentT,
+            "studentt": StudentT,
+            "student": StudentT,
+            "t": StudentT,
+            "std": StudentT,
+            "skewed-t": SkewedT,
+            "skewt": SkewedT,
+            "skew-t": SkewedT,
+            "skewstudent": SkewedT,
+            "sstd": SkewedT,
+            "ged": GeneralizedError,
+            "generalized-error": GeneralizedError,
+            "generalised-error": GeneralizedError,
+            "mixture-normal": MixtureNormal,
+            "mixture": MixtureNormal,
+            "normalmix": MixtureNormal,
+            "mixturenormal": MixtureNormal,
+        }
+
+        cls = mapping.get(normalized)
+        if cls is None:
+            canonical = "normal, student-t, skewed-t, ged, mixture-normal"
+            msg = f"Unknown distribution: {dist!r}. Available: {canonical}."
+            raise ValueError(msg)
+        return cls()
 
     # --- Abstract methods (subclass MUST implement) ---
 
@@ -131,6 +162,45 @@ class VolatilityModel(ABC):
     @abstractmethod
     def num_params(self) -> int:
         """Number of model parameters."""
+
+    # --- Composite (variance + distribution) parameter helpers ---
+
+    @property
+    def n_total_params(self) -> int:
+        """Total number of free parameters (variance + distribution)."""
+        return self.num_params + self.dist.num_params
+
+    def full_start_params(self) -> NDArray[np.float64]:
+        """Starting values for the combined [variance, dist] vector."""
+        return np.concatenate([self.start_params, self.dist.start_params()])
+
+    def full_param_names(self) -> list[str]:
+        """Combined [variance, dist] parameter names."""
+        return list(self.param_names) + list(self.dist.param_names)
+
+    def full_bounds(self) -> list[tuple[float, float]]:
+        """Combined [variance, dist] parameter bounds."""
+        return list(self.bounds()) + list(self.dist.bounds())
+
+    def full_transform_params(self, unconstrained: NDArray[np.float64]) -> NDArray[np.float64]:
+        """Transform combined [variance, dist] params to constrained space."""
+        nv = self.num_params
+        return np.concatenate(
+            [
+                self.transform_params(unconstrained[:nv]),
+                self.dist.transform_params(unconstrained[nv:]),
+            ]
+        )
+
+    def full_untransform_params(self, constrained: NDArray[np.float64]) -> NDArray[np.float64]:
+        """Transform combined [variance, dist] params to unconstrained space."""
+        nv = self.num_params
+        return np.concatenate(
+            [
+                self.untransform_params(constrained[:nv]),
+                self.dist.untransform_params(constrained[nv:]),
+            ]
+        )
 
     # --- Concrete methods ---
 
@@ -188,10 +258,13 @@ class VolatilityModel(ABC):
         """
         if backcast is None:
             backcast = self._backcast(self.endog)
-        sigma2 = self._variance_recursion(params, self.endog, backcast)
+        nv = self.num_params
+        var_params = params[:nv]
+        dist_params = params[nv:]
+        sigma2 = self._variance_recursion(var_params, self.endog, backcast)
         # Ensure positivity
         sigma2 = np.maximum(sigma2, 1e-12)
-        ll_per_obs = self.dist.loglikelihood(self.endog, sigma2)
+        ll_per_obs = self.dist.loglikelihood(self.endog, sigma2, dist_params)
         return float(np.sum(ll_per_obs))
 
     def loglike_per_obs(
@@ -213,9 +286,12 @@ class VolatilityModel(ABC):
         """
         if backcast is None:
             backcast = self._backcast(self.endog)
-        sigma2 = self._variance_recursion(params, self.endog, backcast)
+        nv = self.num_params
+        var_params = params[:nv]
+        dist_params = params[nv:]
+        sigma2 = self._variance_recursion(var_params, self.endog, backcast)
         sigma2 = np.maximum(sigma2, 1e-12)
-        return self.dist.loglikelihood(self.endog, sigma2)
+        return self.dist.loglikelihood(self.endog, sigma2, dist_params)
 
     def simulate(
         self,
@@ -240,9 +316,12 @@ class VolatilityModel(ABC):
             (returns, conditional_volatility) each shape (n,).
         """
         rng = np.random.default_rng(seed)
-        z = self.dist.simulate(n, rng)
+        nv = self.num_params
+        var_params = params[:nv]
+        dist_params = params[nv:]
+        z = self.dist.simulate(n, rng, dist_params)
 
-        backcast = params[0] / (1.0 - np.sum(params[1:]))  # unconditional variance
+        backcast = var_params[0] / (1.0 - np.sum(var_params[1:]))  # unconditional variance
         if not np.isfinite(backcast) or backcast <= 0:
             backcast = np.var(self.endog) if len(self.endog) > 0 else 1.0
 
@@ -254,7 +333,9 @@ class VolatilityModel(ABC):
         returns[0] = np.sqrt(sigma2[0]) * z[0]
 
         for t in range(1, n):
-            sigma2[t : t + 1] = self._variance_recursion(params, returns[:t], float(backcast))[-1:]
+            sigma2[t : t + 1] = self._variance_recursion(var_params, returns[:t], float(backcast))[
+                -1:
+            ]
             returns[t] = np.sqrt(max(sigma2[t], 1e-12)) * z[t]
 
         return returns, np.sqrt(sigma2)

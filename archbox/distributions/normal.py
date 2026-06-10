@@ -26,6 +26,7 @@ class Normal(Distribution):
         self,
         resids: NDArray[np.float64],
         sigma2: NDArray[np.float64],
+        dist_params: NDArray[np.float64] | None = None,
     ) -> NDArray[np.float64]:
         """Compute per-observation Normal log-likelihood.
 
@@ -35,6 +36,8 @@ class Normal(Distribution):
             Residuals eps_t, shape (T,).
         sigma2 : ndarray
             Conditional variance sigma^2_t, shape (T,).
+        dist_params : ndarray, optional
+            Ignored (Normal has no shape parameters).
 
         Returns
         -------
@@ -73,7 +76,12 @@ class Normal(Distribution):
         """
         return float(stats.norm.cdf(x))
 
-    def simulate(self, n: int, rng: np.random.Generator) -> NDArray[np.float64]:
+    def simulate(
+        self,
+        n: int,
+        rng: np.random.Generator,
+        dist_params: NDArray[np.float64] | None = None,
+    ) -> NDArray[np.float64]:
         """Simulate n standard normal draws.
 
         Parameters
@@ -82,6 +90,8 @@ class Normal(Distribution):
             Number of draws.
         rng : np.random.Generator
             Random number generator.
+        dist_params : ndarray, optional
+            Ignored (Normal has no shape parameters).
 
         Returns
         -------

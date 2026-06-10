@@ -49,7 +49,14 @@ class ArchResults:
         """Initialize ArchResults with fitted model outputs."""
         self._model = model
         self.params = params
-        self.param_names = model.param_names
+        # Number of variance parameters (leading block of `params`).
+        self._n_var = getattr(model, "num_params", len(params))
+        if hasattr(model, "full_param_names"):
+            self.param_names = model.full_param_names()
+        else:
+            self.param_names = model.param_names
+        # Fitted distribution shape parameters (trailing block of `params`).
+        self._dist_params = np.asarray(params[self._n_var :], dtype=np.float64)
         self.loglike = loglike
         self.nobs = model.nobs
         self.convergence = convergence
@@ -83,8 +90,8 @@ class ArchResults:
         float
             Persistence value. Must be < 1 for stationarity.
         """
-        # params = [omega, alpha_1, ..., alpha_q, beta_1, ..., beta_p]
-        return float(np.sum(self.params[1:]))
+        # params = [omega, alpha_1, ..., alpha_q, beta_1, ..., beta_p, dist...]
+        return float(np.sum(self.params[1 : self._n_var]))
 
     def half_life(self) -> float:
         """Compute half-life of volatility shocks.
@@ -144,8 +151,9 @@ class ArchResults:
         last_resid2 = self._model.endog[-1] ** 2
         last_sigma2 = self._sigma2[-1]
 
-        alphas = self.params[1 : 1 + getattr(self._model, "q", 1)]
-        betas = self.params[1 + getattr(self._model, "q", 1) :]
+        q = getattr(self._model, "q", 1)
+        alphas = self.params[1 : 1 + q]
+        betas = self.params[1 + q : self._n_var]
 
         sigma2_next = omega + np.sum(alphas) * last_resid2 + np.sum(betas) * last_sigma2
 
@@ -160,6 +168,93 @@ class ArchResults:
             "variance": variance,
             "volatility": np.sqrt(variance),
         }
+
+    def _fitted_dist(self) -> Any:
+        """Return a distribution instance reflecting the fitted shape params.
+
+        The distribution objects expose ``ppf``/``cdf`` that read shape params
+        from internal fixed values (set at construction). Since the fitted
+        instance on the model holds no fitted shape value, we rebuild a fresh
+        instance with the estimated parameters bound as constructor kwargs.
+
+        If the estimated shape params cannot be mapped onto the constructor
+        (unknown distribution), we fall back to the model's distribution
+        instance and its default shape parameters.
+        """
+        dist = self._model.dist
+        names = list(getattr(dist, "param_names", []))
+        if len(self._dist_params) == 0 or len(names) != len(self._dist_params):
+            return dist
+
+        # Map fitted param names to known constructor kwargs.
+        kwarg_map = {"nu": "nu", "lambda": "lam", "lam": "lam", "p": "p", "sigma1": "sigma1"}
+        kwargs: dict[str, float] = {}
+        for name, value in zip(names, self._dist_params, strict=True):
+            key = kwarg_map.get(name)
+            if key is None:
+                # Unknown shape param: fall back to model's dist (default shape).
+                return dist
+            kwargs[key] = float(value)
+        try:
+            return type(dist)(**kwargs)
+        except TypeError:
+            # Constructor signature mismatch: fall back to model's dist.
+            return dist
+
+    def _sigma_next(self) -> float:
+        """Conditional std for the next step (one-step-ahead forecast)."""
+        try:
+            fc = self.forecast(horizon=1)
+            return float(np.sqrt(fc["variance"][0]))
+        except Exception:  # noqa: BLE001 - robust fallback to last fitted sigma
+            return float(np.sqrt(self._sigma2[-1]))
+
+    def var(self, alpha: float = 0.05, horizon: int = 1) -> float:
+        """One-step parametric Value-at-Risk as a positive loss number.
+
+        Parameters
+        ----------
+        alpha : float
+            Tail probability (e.g. 0.01 for 99% VaR).
+        horizon : int
+            Forecast horizon (one-step variance is used for the std).
+
+        Returns
+        -------
+        float
+            VaR as a positive loss magnitude.
+        """
+        sigma_next = self._sigma_next()
+        dist = self._fitted_dist()
+        quantile = float(dist.ppf(alpha))
+        return float(-(self._model.mu + sigma_next * quantile))
+
+    def es(self, alpha: float = 0.05) -> float:
+        """Parametric Expected Shortfall (positive loss).
+
+        Parameters
+        ----------
+        alpha : float
+            Tail probability (e.g. 0.01 for 99% ES).
+
+        Returns
+        -------
+        float
+            Expected Shortfall as a positive loss magnitude.
+        """
+        sigma_next = self._sigma_next()
+        dist = self._fitted_dist()
+
+        # Closed form for Normal; numeric integration of the inverse CDF
+        # (tail mean of the quantile function) for general distributions.
+        if dist.name == "Normal":
+            q = float(stats.norm.ppf(alpha))
+            tail_mean_z = -float(stats.norm.pdf(q)) / alpha
+        else:
+            us = np.linspace(1e-4, alpha, 200)
+            tail_mean_z = float(np.mean([dist.ppf(float(u)) for u in us]))
+
+        return float(-(self._model.mu + sigma_next * tail_mean_z))
 
     def summary(self) -> str:
         """Generate formatted summary table.

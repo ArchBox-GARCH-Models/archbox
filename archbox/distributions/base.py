@@ -22,6 +22,7 @@ class Distribution(ABC):
         self,
         resids: NDArray[np.float64],
         sigma2: NDArray[np.float64],
+        dist_params: NDArray[np.float64] | None = None,
     ) -> NDArray[np.float64]:
         """Compute per-observation log-likelihood.
 
@@ -31,12 +32,28 @@ class Distribution(ABC):
             Residuals eps_t = r_t - mu, shape (T,).
         sigma2 : ndarray
             Conditional variance sigma^2_t, shape (T,).
+        dist_params : ndarray, optional
+            Distribution shape parameters.
 
         Returns
         -------
         ndarray
             Log-likelihood per observation, shape (T,).
         """
+
+    def transform_params(self, unconstrained: NDArray[np.float64]) -> NDArray[np.float64]:
+        """Transform unconstrained distribution params to constrained space.
+
+        Default is a no-op (for distributions with no shape parameters).
+        """
+        return unconstrained
+
+    def untransform_params(self, constrained: NDArray[np.float64]) -> NDArray[np.float64]:
+        """Transform constrained distribution params to unconstrained space.
+
+        Default is a no-op (for distributions with no shape parameters).
+        """
+        return constrained
 
     @abstractmethod
     def ppf(self, q: float) -> float:
@@ -69,7 +86,12 @@ class Distribution(ABC):
         """
 
     @abstractmethod
-    def simulate(self, n: int, rng: np.random.Generator) -> NDArray[np.float64]:
+    def simulate(
+        self,
+        n: int,
+        rng: np.random.Generator,
+        dist_params: NDArray[np.float64] | None = None,
+    ) -> NDArray[np.float64]:
         """Simulate n draws from D(0, 1).
 
         Parameters
@@ -78,6 +100,8 @@ class Distribution(ABC):
             Number of draws.
         rng : np.random.Generator
             Random number generator.
+        dist_params : ndarray, optional
+            Distribution shape parameters (ignored by parameter-free distributions).
 
         Returns
         -------

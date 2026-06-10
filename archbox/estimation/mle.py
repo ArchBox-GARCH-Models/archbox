@@ -61,7 +61,7 @@ class MLEstimator:
         if starting_values is not None:
             x0_constrained = starting_values.copy()
         else:
-            x0_constrained = model.start_params.copy()
+            x0_constrained = model.full_start_params()
 
         if variance_targeting:
             return self._fit_with_targeting(
@@ -91,11 +91,36 @@ class MLEstimator:
         disp: bool,
     ) -> ArchResults:
         """Standard MLE fit (all parameters free)."""
-        x0 = model.untransform_params(x0_constrained)
+        nv = model.num_params
+        n_dist = model.dist.num_params
+
+        # Warm-start: when shape parameters are present, the joint surface is
+        # very flat along the shape direction and the optimizer can settle in a
+        # poor region of the variance block. Refine the variance block first
+        # (holding shape params at their starting values), then optimize jointly.
+        if n_dist > 0:
+            x0_var_unc = model.untransform_params(x0_constrained[:nv])
+
+            def neg_loglike_var(unc_var: NDArray[np.float64]) -> float:
+                """Negative log-likelihood over the variance block only."""
+                var_c = model.transform_params(unc_var)
+                full_c = np.concatenate([var_c, x0_constrained[nv:]])
+                return -model.loglike(full_c, backcast)
+
+            var_result = optimize.minimize(
+                neg_loglike_var,
+                x0_var_unc,
+                method=optimizer,
+                options={"maxiter": maxiter, "disp": False, "ftol": 1e-10},
+            )
+            warm_var = model.transform_params(var_result.x)
+            x0_constrained = np.concatenate([warm_var, x0_constrained[nv:]])
+
+        x0 = model.full_untransform_params(x0_constrained)
 
         def neg_loglike(unconstrained: NDArray[np.float64]) -> float:
             """Compute negative log-likelihood for optimization."""
-            constrained = model.transform_params(unconstrained)
+            constrained = model.full_transform_params(unconstrained)
             ll = model.loglike(constrained, backcast)
             return -ll
 
@@ -109,10 +134,11 @@ class MLEstimator:
         if not result.success:
             logger.warning("Optimization did not converge: %s", result.message)
 
-        params_opt = model.transform_params(result.x)
+        params_opt = model.full_transform_params(result.x)
         loglike_val = -result.fun
 
-        sigma2 = model._variance_recursion(params_opt, model.endog, backcast)
+        # _variance_recursion reads only the leading variance entries.
+        sigma2 = model._variance_recursion(params_opt[: model.num_params], model.endog, backcast)
         sigma2 = np.maximum(sigma2, 1e-12)
 
         se_robust, se_nonrobust = self._compute_standard_errors(
@@ -143,26 +169,46 @@ class MLEstimator:
         """MLE fit with variance targeting (omega fixed)."""
         sample_var = float(np.var(model.endog))
 
-        # x0 without omega: [alpha_1, ..., alpha_q, beta_1, ..., beta_p]
-        x0_free = x0_constrained[1:]
-        x0_free_unc = np.log(x0_free)  # simple positive transform
+        nv = model.num_params
+        dist = model.dist
 
-        def neg_loglike_targeted(unconstrained_free: NDArray[np.float64]) -> float:
-            """Compute negative log-likelihood with variance targeting."""
-            free_params = np.exp(unconstrained_free)
-            persistence = np.sum(free_params)
+        # Split constrained start values into variance and distribution blocks.
+        var_constrained = x0_constrained[:nv]
+        dist_constrained = x0_constrained[nv:]
+
+        # Free variance params (exclude omega), optimized in log space.
+        x0_free = var_constrained[1:]
+        x0_free_unc = np.log(x0_free)
+        # Distribution params optimized in their own unconstrained space.
+        x0_dist_unc = dist.untransform_params(dist_constrained)
+        x0_combined = np.concatenate([x0_free_unc, x0_dist_unc])
+        n_free_var = len(x0_free_unc)
+
+        def _build_full(unconstrained: NDArray[np.float64]) -> NDArray[np.float64] | None:
+            """Reconstruct full constrained params from targeting vector."""
+            unc_free_var = unconstrained[:n_free_var]
+            unc_dist = unconstrained[n_free_var:]
+            free_var = np.exp(unc_free_var)
+            persistence = np.sum(free_var)
             if persistence >= 0.9999:
-                return 1e10
+                return None
             omega = sample_var * (1.0 - persistence)
             if omega <= 0:
+                return None
+            dist_params = dist.transform_params(unc_dist)
+            return np.concatenate([[omega], free_var, dist_params])
+
+        def neg_loglike_targeted(unconstrained: NDArray[np.float64]) -> float:
+            """Compute negative log-likelihood with variance targeting."""
+            full_params = _build_full(unconstrained)
+            if full_params is None:
                 return 1e10
-            full_params = np.concatenate([[omega], free_params])
             ll = model.loglike(full_params, backcast)
             return -ll
 
         result = optimize.minimize(
             neg_loglike_targeted,
-            x0_free_unc,
+            x0_combined,
             method=optimizer,
             options={"maxiter": maxiter, "disp": disp, "ftol": 1e-10},
         )
@@ -170,13 +216,17 @@ class MLEstimator:
         if not result.success:
             logger.warning("Optimization did not converge: %s", result.message)
 
-        free_params = np.exp(result.x)
-        persistence = np.sum(free_params)
-        omega = sample_var * (1.0 - persistence)
-        params_opt = np.concatenate([[omega], free_params])
+        params_opt = _build_full(result.x)
+        if params_opt is None:
+            # Fall back to a feasible reconstruction ignoring guards.
+            unc_free_var = result.x[:n_free_var]
+            unc_dist = result.x[n_free_var:]
+            free_var = np.exp(unc_free_var)
+            omega = sample_var * (1.0 - np.sum(free_var))
+            params_opt = np.concatenate([[omega], free_var, dist.transform_params(unc_dist)])
         loglike_val = -result.fun
 
-        sigma2 = model._variance_recursion(params_opt, model.endog, backcast)
+        sigma2 = model._variance_recursion(params_opt[:nv], model.endog, backcast)
         sigma2 = np.maximum(sigma2, 1e-12)
 
         se_robust, se_nonrobust = self._compute_standard_errors(
