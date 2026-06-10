@@ -230,7 +230,7 @@ class MultivariateVolatilityModel(ABC):
                     if sign <= 0:
                         return 1e10
                     r_inv = np.linalg.solve(r_mat, z)
-                    ll += -0.5 * (logdet + float(z.T @ r_inv) - float(z.T @ z))
+                    ll += -0.5 * (logdet + (z.T @ r_inv).item() - (z.T @ z).item())
                 except np.linalg.LinAlgError:
                     return 1e10
             return -ll
@@ -312,7 +312,7 @@ class MultivariateVolatilityModel(ABC):
                 if sign <= 0:
                     return -1e10
                 r_inv_z = np.linalg.solve(corr_t[t], z)
-                quad = float(z.T @ r_inv_z)
+                quad = (z.T @ r_inv_z).item()
             except np.linalg.LinAlgError:
                 return -1e10
 
