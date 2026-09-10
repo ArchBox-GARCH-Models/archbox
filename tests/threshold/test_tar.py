@@ -10,6 +10,7 @@ Tests:
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from archbox.threshold.tar import TAR
 
@@ -159,3 +160,149 @@ class TestTAR:
         assert np.isfinite(results.aic)
         assert np.isfinite(results.bic)
         assert results.bic > results.aic  # BIC penalizes more for n > ~7
+
+
+class TestTARThreeRegimes:
+    """TAR must actually fit three regimes when asked (audit finding #1)."""
+
+    @staticmethod
+    def _simulate_3regime(n: int = 3000, seed: int = 5) -> np.ndarray:
+        rng = np.random.default_rng(seed)
+        y = np.zeros(n)
+        for t in range(1, n):
+            if y[t - 1] < -0.5:
+                y[t] = -0.3 + 0.6 * y[t - 1] + rng.standard_normal() * 0.3
+            elif y[t - 1] > 0.5:
+                y[t] = 0.3 - 0.6 * y[t - 1] + rng.standard_normal() * 0.3
+            else:
+                y[t] = 0.9 * y[t - 1] + rng.standard_normal() * 0.3
+        return y
+
+    def test_three_regimes_fitted(self) -> None:
+        y = self._simulate_3regime()
+        results = TAR(y, order=1, delay=1, n_regimes=3, grid_points=60).fit()
+
+        assert results.n_regimes == 3
+        assert isinstance(results.threshold, list)
+        assert results.threshold[0] < results.threshold[1]
+        assert set(results.params) == {"regime_1", "regime_2", "regime_3"}
+        assert results.params_regime3 is not None
+        # DGP slopes are 0.6 (lower), 0.9 (middle) and -0.6 (upper); the upper
+        # regime is visited rarely, so it is checked by sign and magnitude.
+        assert abs(results.params_regime1[1] - 0.6) < 0.25
+        assert abs(results.params_regime2[1] - 0.9) < 0.25
+        assert -0.95 < results.params_regime3[1] < -0.3
+
+    def test_three_regime_residuals_and_forecast(self) -> None:
+        y = self._simulate_3regime(n=2000, seed=6)
+        results = TAR(y, order=1, delay=1, n_regimes=3, grid_points=50).fit()
+        assert len(results.resid) == results.nobs
+        assert np.all(np.isfinite(results.resid))
+        fc = results.forecast(horizon=5)
+        assert fc.shape == (5,)
+        assert np.all(np.isfinite(fc))
+
+    def test_invalid_n_regimes(self) -> None:
+        y = _simulate_tar(n=500, seed=42)
+        with pytest.raises(ValueError, match="n_regimes must be 2 or 3"):
+            TAR(y, order=1, delay=1, n_regimes=4)
+
+
+class TestTARExogenousThreshold:
+    """The exogenous threshold variable drives both the fit and the forecast."""
+
+    @staticmethod
+    def _simulate(n: int = 2000, seed: int = 42) -> tuple[np.ndarray, np.ndarray]:
+        rng = np.random.default_rng(seed)
+        s_ext = rng.standard_normal(n)
+        y = np.zeros(n)
+        for t in range(1, n):
+            if s_ext[t - 1] <= 0.0:
+                y[t] = 0.5 + 0.3 * y[t - 1] + rng.standard_normal() * 0.5
+            else:
+                y[t] = -0.3 + 0.7 * y[t - 1] + rng.standard_normal() * 0.5
+        return y, s_ext
+
+    def test_threshold_recovered(self) -> None:
+        y, s_ext = self._simulate()
+        results = TAR(y, order=1, delay=1, threshold_var=s_ext).fit()
+        # True split of the exogenous variable is at zero.
+        assert abs(results.threshold) < 0.25
+        assert results.params_regime1[0] > results.params_regime2[0]
+
+    def test_forecast_uses_exogenous_variable(self) -> None:
+        y, s_ext = self._simulate(n=1000, seed=3)
+        model = TAR(y, order=1, delay=1, threshold_var=s_ext)
+        results = model.fit()
+
+        # One step ahead the relevant threshold value is z_{T-1}, which is
+        # known: the forecast must come from the regime it selects.
+        s_last = s_ext[-1]
+        regime = results.params_regime2 if s_last > results.threshold else results.params_regime1
+        x = np.array([1.0, y[-1]])
+        fc = model.forecast(results, horizon=1)
+        assert np.isclose(fc[0], float(x @ regime))
+
+    def test_effective_length_threshold_var_accepted(self) -> None:
+        y, s_ext = self._simulate(n=600, seed=9)
+        full = TAR(y, order=1, delay=1, threshold_var=s_ext).fit()
+        # Same variable supplied already aligned with the effective sample.
+        eff = TAR(y, order=1, delay=1, threshold_var=s_ext[:-1]).fit()
+        assert np.isclose(full.threshold, eff.threshold)
+        assert np.allclose(full.params_regime1, eff.params_regime1)
+
+    def test_long_horizon_warns_about_held_threshold(self) -> None:
+        """Beyond the delay the exogenous variable is unknown: warn and hold."""
+        y, s_ext = self._simulate(n=600, seed=5)
+        model = TAR(y, order=1, delay=1, threshold_var=s_ext)
+        results = model.fit()
+        with pytest.warns(UserWarning, match="exceeds the delay"):
+            fc = model.forecast(results, horizon=4)
+        assert fc.shape == (4,)
+        assert np.all(np.isfinite(fc))
+
+    def test_nan_threshold_var_rejected(self) -> None:
+        y, s_ext = self._simulate(n=400, seed=1)
+        s_bad = s_ext.copy()
+        s_bad[10] = np.nan
+        with pytest.raises(ValueError, match="non-finite"):
+            TAR(y, order=1, delay=1, threshold_var=s_bad)
+
+
+class TestTARLinearityField:
+    """results.linearity_test is populated by the fit (audit finding #6)."""
+
+    def test_linearity_test_populated(self) -> None:
+        y = _simulate_tar(n=1500, c=0.0, seed=42)
+        results = TAR(y, order=1, delay=1).fit()
+        assert results.linearity_test is not None
+        assert results.linearity_test.test_name == "Luukkonen-Saikkonen-Terasvirta"
+        assert np.isfinite(results.linearity_test.statistic)
+        assert results.linearity_test.pvalue < 0.05
+        assert "Linearity Test" in results.summary()
+
+
+class TestHardThresholdLoglike:
+    """The packaged log-likelihood matches the base-class formula."""
+
+    def test_two_regime_loglike_matches_base(self) -> None:
+        y = _simulate_tar(n=1500, c=0.0, seed=1)
+        model = TAR(y, order=1, delay=1)
+        results = model.fit()
+        ll = model.loglike(
+            results.params_regimes,
+            [results.sigma2["regime_1"], results.sigma2["regime_2"]],
+            results.transition_values,
+        )
+        assert np.isclose(ll, results.loglike)
+
+    def test_three_regime_loglike_and_resid_match_base(self) -> None:
+        y = TestTARThreeRegimes._simulate_3regime(n=2000, seed=8)
+        model = TAR(y, order=1, delay=1, n_regimes=3, grid_points=50)
+        results = model.fit()
+        sigma2 = [results.sigma2[f"regime_{i}"] for i in (1, 2, 3)]
+        ll = model.loglike(results.params_regimes, sigma2, results.transition_values)
+        assert np.isclose(ll, results.loglike)
+
+        fitted = model.fitted_values(model._X, results.transition_values, results.params_regimes)
+        assert np.allclose(model._y - fitted, results.resid)

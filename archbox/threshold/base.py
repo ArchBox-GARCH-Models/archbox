@@ -11,11 +11,45 @@ References
 
 from __future__ import annotations
 
+import warnings
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
+
+
+def count_params(
+    n_regimes: int,
+    order: int,
+    n_transition: int,
+    n_variances: int,
+    include_delay: bool = False,
+) -> int:
+    """Count estimated parameters of a threshold model (for AIC/BIC).
+
+    Parameters
+    ----------
+    n_regimes : int
+        Number of regimes (each contributing ``order + 1`` AR coefficients).
+    order : int
+        AR order p.
+    n_transition : int
+        Number of transition parameters (thresholds for TAR/SETAR,
+        gamma and c for LSTAR/ESTAR).
+    n_variances : int
+        Number of estimated innovation variances (one per regime for
+        hard-threshold models, one in total for the homoskedastic STAR models).
+    include_delay : bool
+        Whether the delay d was estimated from the data (adds one parameter).
+
+    Returns
+    -------
+    int
+        Total number of estimated parameters.
+    """
+    return n_regimes * (order + 1) + n_transition + n_variances + (1 if include_delay else 0)
 
 
 class ThresholdModel(ABC):
@@ -61,6 +95,16 @@ class ThresholdModel(ABC):
         self.order = order
         self.delay = delay
         self.n_regimes = n_regimes
+        # Exogenous threshold variable (set by TAR when threshold_var is given).
+        self._threshold_var: NDArray[np.float64] | None = None
+
+        if not np.all(np.isfinite(self.endog)):
+            n_bad = int(np.sum(~np.isfinite(self.endog)))
+            msg = (
+                f"endog contains {n_bad} non-finite value(s) (NaN or inf); "
+                "threshold models require a complete series."
+            )
+            raise ValueError(msg)
 
         if self.nobs < 2 * (order + delay) + 10:
             msg = (
@@ -98,9 +142,32 @@ class ThresholdModel(ABC):
         s : ndarray, shape (T_eff,)
             Transition variable s_t = y_{t-d}.
         """
+        return self._build_for_delay(self.delay)
+
+    def _build_for_delay(
+        self, d: int, start: int | None = None
+    ) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
+        """Build (y, X, s) for a given delay and (optionally) a fixed start index.
+
+        Parameters
+        ----------
+        d : int
+            Delay parameter.
+        start : int, optional
+            First time index of the effective sample. Default ``max(order, d)``.
+            Passing a common start makes samples for different delays
+            comparable (same effective length).
+
+        Returns
+        -------
+        y, X, s : tuple of ndarrays
+        """
         p = self.order
-        d = self.delay
-        start = max(p, d)
+        if start is None:
+            start = max(p, d)
+        if start < max(p, d):
+            msg = f"start={start} is too small for order={p}, delay={d}"
+            raise ValueError(msg)
         t_eff = self.nobs - start
 
         y = self.endog[start:]
@@ -108,7 +175,10 @@ class ThresholdModel(ABC):
         for lag in range(1, p + 1):
             x_mat[:, lag] = self.endog[start - lag : self.nobs - lag]
 
-        s = self.endog[start - d : self.nobs - d]
+        if self._threshold_var is not None:
+            s = self._threshold_var[start - d : self.nobs - d]
+        else:
+            s = self.endog[start - d : self.nobs - d]
 
         return y, x_mat, s
 
@@ -135,15 +205,64 @@ class ThresholdModel(ABC):
 
     @property
     @abstractmethod
-    def start_params(self) -> NDArray[np.float64]:
-        """Initial parameter values for optimization."""
-
-    @property
-    @abstractmethod
     def param_names(self) -> list[str]:
         """Parameter names."""
 
     # --- Concrete methods ---
+
+    def regime_weights(self, g_values: NDArray[np.float64]) -> NDArray[np.float64]:
+        """Convert transition values G(s_t) into per-regime weights.
+
+        For two regimes the weights are ``[1 - G, G]``. For three regimes the
+        weights are the piecewise-linear "tent" functions of G, so that
+        G = 0, 0.5, 1 select regime 1, 2, 3 exactly (this is the convention
+        used by the indicator transition of SETAR/TAR with two thresholds).
+
+        Parameters
+        ----------
+        g_values : ndarray, shape (n,)
+            Transition values in [0, 1].
+
+        Returns
+        -------
+        ndarray, shape (n, n_regimes)
+            Non-negative weights summing to one along axis 1.
+        """
+        g = np.asarray(g_values, dtype=np.float64).ravel()
+        if self.n_regimes == 2:
+            return np.column_stack([1.0 - g, g])
+        w1 = np.clip(1.0 - 2.0 * g, 0.0, 1.0)
+        w3 = np.clip(2.0 * g - 1.0, 0.0, 1.0)
+        w2 = 1.0 - w1 - w3
+        return np.column_stack([w1, w2, w3])
+
+    def fitted_values(
+        self,
+        x_mat: NDArray[np.float64],
+        g_values: NDArray[np.float64],
+        params_regimes: Sequence[NDArray[np.float64]],
+    ) -> NDArray[np.float64]:
+        """Conditional mean implied by regime parameters and transition values.
+
+        Parameters
+        ----------
+        x_mat : ndarray, shape (n, p+1)
+            Design matrix.
+        g_values : ndarray, shape (n,)
+            Transition values G(s_t).
+        params_regimes : sequence of ndarray
+            AR parameters per regime.
+
+        Returns
+        -------
+        ndarray, shape (n,)
+            Fitted values.
+        """
+        weights = self.regime_weights(g_values)
+        fitted = np.zeros(x_mat.shape[0])
+        for i, beta in enumerate(params_regimes):
+            fitted += weights[:, i] * (x_mat @ np.asarray(beta, dtype=np.float64))
+        return fitted
 
     def fit(self, method: str = "cls") -> Any:
         """Fit the model via Conditional Least Squares.
@@ -170,25 +289,20 @@ class ThresholdModel(ABC):
 
     def loglike(
         self,
-        params_regime1: NDArray[np.float64],
-        params_regime2: NDArray[np.float64],
-        sigma2_1: float,
-        sigma2_2: float,
+        params_regimes: Sequence[NDArray[np.float64]],
+        sigma2: Sequence[float],
         g_values: NDArray[np.float64],
     ) -> float:
-        """Compute log-likelihood for the threshold model.
+        """Gaussian log-likelihood of the threshold model on the fitted sample.
 
         Parameters
         ----------
-        params_regime1 : ndarray
-            Parameters for regime 1.
-        params_regime2 : ndarray
-            Parameters for regime 2.
-        sigma2_1 : float
-            Variance of regime 1.
-        sigma2_2 : float
-            Variance of regime 2.
-        g_values : ndarray
+        params_regimes : sequence of ndarray
+            AR parameters per regime (length ``n_regimes``).
+        sigma2 : sequence of float
+            Innovation variance per regime (length ``n_regimes``). For a
+            homoskedastic model pass the same value for every regime.
+        g_values : ndarray, shape (T_eff,)
             Transition values G(s_t) in [0, 1].
 
         Returns
@@ -197,21 +311,50 @@ class ThresholdModel(ABC):
             Total log-likelihood.
         """
         y = self._y
-        x_mat = self._X
-        fitted1 = x_mat @ params_regime1
-        fitted2 = x_mat @ params_regime2
-        fitted = fitted1 * (1 - g_values) + fitted2 * g_values
+        weights = self.regime_weights(g_values)
+        fitted = self.fitted_values(self._X, g_values, params_regimes)
         resid = y - fitted
 
-        # Weighted variance
-        sigma2 = sigma2_1 * (1 - g_values) + sigma2_2 * g_values
-        sigma2 = np.maximum(sigma2, 1e-12)
+        sig = np.asarray(sigma2, dtype=np.float64).ravel()
+        if sig.size != weights.shape[1]:
+            msg = f"sigma2 must have {weights.shape[1]} entries, got {sig.size}"
+            raise ValueError(msg)
+        sigma2_t = np.maximum(weights @ sig, 1e-12)
 
-        ll = -0.5 * np.sum(np.log(2 * np.pi) + np.log(sigma2) + resid**2 / sigma2)
+        ll = -0.5 * np.sum(np.log(2 * np.pi) + np.log(sigma2_t) + resid**2 / sigma2_t)
         return float(ll)
 
-    def forecast(self, results: Any, horizon: int = 10) -> dict[str, NDArray[np.float64]]:
-        """Forecast using fitted model.
+    def _threshold_value_at(self, y_path: NDArray[np.float64], t: int) -> float:
+        """Value of the transition variable used to predict observation ``t``.
+
+        Parameters
+        ----------
+        y_path : ndarray
+            Series (history extended by already-computed forecasts).
+        t : int
+            Time index of the observation being predicted.
+
+        Returns
+        -------
+        float
+            s_t.
+        """
+        idx = t - self.delay
+        if self._threshold_var is not None:
+            # Exogenous threshold variable: use its own (possibly future) value
+            # when available, otherwise hold the last observed value.
+            if idx >= len(self._threshold_var):
+                idx = len(self._threshold_var) - 1
+            return float(self._threshold_var[idx])
+        return float(y_path[idx])
+
+    def forecast(self, results: Any, horizon: int = 10) -> NDArray[np.float64]:
+        """Point forecasts by deterministic (skeleton) iteration.
+
+        The regime used at each step is the one implied by the transition
+        variable of the forecast path, so a three-regime model uses the
+        third regime's coefficients whenever the threshold variable is above
+        the upper threshold.
 
         Parameters
         ----------
@@ -222,38 +365,122 @@ class ThresholdModel(ABC):
 
         Returns
         -------
-        dict
-            Dictionary with 'mean' forecast array.
+        ndarray, shape (horizon,)
+            Point forecasts.
         """
-        y_hist = self.endog.copy()
-        forecasts = np.empty(horizon)
+        if horizon < 1:
+            msg = f"horizon must be >= 1, got {horizon}"
+            raise ValueError(msg)
+
+        if self._threshold_var is not None and horizon > self.delay:
+            warnings.warn(
+                "Forecast horizon exceeds the delay of the exogenous threshold "
+                "variable; its last observed value is held constant beyond that "
+                "point.",
+                UserWarning,
+                stacklevel=2,
+            )
+
+        y_path = np.concatenate([self.endog, np.zeros(horizon)])
+        params_regimes = results.params_regimes
 
         for h in range(horizon):
-            # Build regressors from last p values
+            t = self.nobs + h
             x = np.ones(self.order + 1)
             for lag in range(1, self.order + 1):
-                idx = len(y_hist) - lag
-                x[lag] = y_hist[idx] if idx >= 0 else 0.0
+                x[lag] = y_path[t - lag]
 
-            # Transition variable
-            s_val = y_hist[len(y_hist) - self.delay] if len(y_hist) >= self.delay else 0.0
-            s_arr = np.array([s_val])
-            g_val = self._transition_function(s_arr, results.transition_params_array)
+            s_val = self._threshold_value_at(y_path, t)
+            g_val = self._transition_function(np.array([s_val]), results.transition_params_array)
+            weights = self.regime_weights(g_val)[0]
+            y_path[t] = float(
+                sum(
+                    weights[i] * float(x @ np.asarray(beta, dtype=np.float64))
+                    for i, beta in enumerate(params_regimes)
+                )
+            )
 
-            # Forecast
-            f1 = x @ results.params_regime1
-            f2 = x @ results.params_regime2
-            forecasts[h] = f1 * (1 - g_val[0]) + f2 * g_val[0]
+        return y_path[self.nobs :].copy()
 
-            y_hist = np.append(y_hist, forecasts[h])
+    def forecast_intervals(
+        self,
+        results: Any,
+        horizon: int = 10,
+        n_sims: int = 1000,
+        alpha: float = 0.05,
+        seed: int | None = None,
+    ) -> dict[str, NDArray[np.float64]]:
+        """Simulation-based predictive distribution of future values.
 
-        return {"mean": forecasts}
+        Future paths are generated by iterating the fitted model with Gaussian
+        innovations whose variance is the (regime-weighted) fitted variance.
+
+        Parameters
+        ----------
+        results : ThresholdResults
+            Fitted results object.
+        horizon : int
+            Number of steps ahead.
+        n_sims : int
+            Number of simulated paths.
+        alpha : float
+            Two-sided interval level (0.05 -> 95% interval).
+        seed : int, optional
+            Random seed.
+
+        Returns
+        -------
+        dict
+            Keys 'mean', 'median', 'lower', 'upper' (shape (horizon,)) and
+            'paths' (shape (n_sims, horizon)).
+        """
+        if horizon < 1:
+            msg = f"horizon must be >= 1, got {horizon}"
+            raise ValueError(msg)
+        if not 0.0 < alpha < 1.0:
+            msg = f"alpha must be in (0, 1), got {alpha}"
+            raise ValueError(msg)
+
+        rng = np.random.default_rng(seed)
+        sigma2 = np.array(
+            [results.sigma2[f"regime_{i + 1}"] for i in range(self.n_regimes)],
+            dtype=np.float64,
+        )
+        params_regimes = results.params_regimes
+        paths = np.empty((n_sims, horizon))
+
+        for sim in range(n_sims):
+            y_path = np.concatenate([self.endog, np.zeros(horizon)])
+            for h in range(horizon):
+                t = self.nobs + h
+                x = np.ones(self.order + 1)
+                for lag in range(1, self.order + 1):
+                    x[lag] = y_path[t - lag]
+                s_val = self._threshold_value_at(y_path, t)
+                g_val = self._transition_function(
+                    np.array([s_val]), results.transition_params_array
+                )
+                weights = self.regime_weights(g_val)[0]
+                mean = sum(
+                    weights[i] * float(x @ np.asarray(beta, dtype=np.float64))
+                    for i, beta in enumerate(params_regimes)
+                )
+                sd = float(np.sqrt(max(float(weights @ sigma2), 1e-12)))
+                y_path[t] = mean + sd * rng.standard_normal()
+            paths[sim] = y_path[self.nobs :]
+
+        return {
+            "mean": paths.mean(axis=0),
+            "median": np.median(paths, axis=0),
+            "lower": np.quantile(paths, alpha / 2.0, axis=0),
+            "upper": np.quantile(paths, 1.0 - alpha / 2.0, axis=0),
+            "paths": paths,
+        }
 
     def simulate(
         self,
         n: int,
-        params_regime1: NDArray[np.float64],
-        params_regime2: NDArray[np.float64],
+        params_regimes: Sequence[NDArray[np.float64]],
         transition_params: NDArray[np.float64],
         sigma: float = 1.0,
         seed: int | None = None,
@@ -264,10 +491,8 @@ class ThresholdModel(ABC):
         ----------
         n : int
             Number of observations to simulate.
-        params_regime1 : ndarray
-            AR parameters for regime 1 [const, phi_1, ..., phi_p].
-        params_regime2 : ndarray
-            AR parameters for regime 2 [const, phi_1, ..., phi_p].
+        params_regimes : sequence of ndarray
+            AR parameters per regime, each [const, phi_1, ..., phi_p].
         transition_params : ndarray
             Transition function parameters.
         sigma : float
@@ -280,6 +505,10 @@ class ThresholdModel(ABC):
         ndarray
             Simulated time series of length n.
         """
+        if len(params_regimes) != self.n_regimes:
+            msg = f"params_regimes must have {self.n_regimes} entries, got {len(params_regimes)}"
+            raise ValueError(msg)
+
         rng = np.random.default_rng(seed)
         p = self.order
         d = self.delay
@@ -288,17 +517,16 @@ class ThresholdModel(ABC):
 
         y = np.zeros(total)
         eps = rng.standard_normal(total) * sigma
+        betas = [np.asarray(b, dtype=np.float64) for b in params_regimes]
 
         for t in range(max(p, d), total):
             x = np.ones(p + 1)
             for lag in range(1, p + 1):
                 x[lag] = y[t - lag]
 
-            s_val = y[t - d]
-            s_arr = np.array([s_val])
-            g_val = self._transition_function(s_arr, transition_params)
-
-            y[t] = (x @ params_regime1) * (1 - g_val[0]) + (x @ params_regime2) * g_val[0] + eps[t]
+            g_val = self._transition_function(np.array([y[t - d]]), transition_params)
+            weights = self.regime_weights(g_val)[0]
+            y[t] = sum(weights[i] * float(x @ beta) for i, beta in enumerate(betas)) + eps[t]
 
         return y[burn:]
 

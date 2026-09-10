@@ -19,6 +19,9 @@ from numpy.typing import NDArray
 class TestResult:
     """Container for statistical test results."""
 
+    # Not a pytest test class.
+    __test__ = False
+
     statistic: float
     pvalue: float
     test_name: str
@@ -34,7 +37,7 @@ class ThresholdResults:
     model_name : str
         Name of the fitted model (e.g., 'TAR', 'LSTAR').
     params : dict[str, NDArray[np.float64]]
-        Parameters per regime {'regime_1': array, 'regime_2': array}.
+        Parameters per regime {'regime_1': array, 'regime_2': array, ...}.
     threshold : float | list[float]
         Estimated threshold value(s) c.
     delay : int
@@ -43,10 +46,9 @@ class ThresholdResults:
         Transition parameters (e.g., {'gamma': ..., 'c': ...}).
     transition_params_array : NDArray[np.float64]
         Transition parameters as array for _transition_function.
-    params_regime1 : NDArray[np.float64]
-        AR parameters for regime 1.
-    params_regime2 : NDArray[np.float64]
-        AR parameters for regime 2.
+    params_regimes : list[NDArray[np.float64]]
+        AR parameters for each regime, in regime order. ``params_regime1``,
+        ``params_regime2`` and ``params_regime3`` are read-only aliases.
     regime_assignments : NDArray[np.float64]
         Regime assignment for each observation (0 or 1 for hard, continuous for STAR).
     transition_values : NDArray[np.float64]
@@ -54,7 +56,7 @@ class ThresholdResults:
     resid : NDArray[np.float64]
         Residuals.
     sigma2 : dict[str, float]
-        Variance per regime {'regime_1': sigma2_1, 'regime_2': sigma2_2}.
+        Variance per regime {'regime_1': sigma2_1, ...}.
     loglike : float
         Log-likelihood.
     aic : float
@@ -70,7 +72,12 @@ class ThresholdResults:
     endog : NDArray[np.float64]
         Original endogenous series.
     linearity_test : TestResult | None
-        Result of linearity test (if computed).
+        Luukkonen-Saikkonen-Terasvirta linearity test computed on the fitted sample.
+    converged : bool
+        Whether the numerical optimizer converged (always True for models
+        estimated by an exhaustive grid search).
+    param_names : list[str]
+        Names of the model parameters (from the model's ``param_names``).
     """
 
     model_name: str
@@ -79,8 +86,7 @@ class ThresholdResults:
     delay: int
     transition_params: dict[str, float]
     transition_params_array: NDArray[np.float64]
-    params_regime1: NDArray[np.float64]
-    params_regime2: NDArray[np.float64]
+    params_regimes: list[NDArray[np.float64]]
     regime_assignments: NDArray[np.float64]
     transition_values: NDArray[np.float64]
     resid: NDArray[np.float64]
@@ -93,7 +99,34 @@ class ThresholdResults:
     n_regimes: int
     endog: NDArray[np.float64]
     linearity_test: TestResult | None = None
+    converged: bool = True
+    param_names: list[str] = field(default_factory=list)
     _model: Any = field(default=None, repr=False)
+
+    def __post_init__(self) -> None:
+        """Normalize the per-regime parameter blocks to a list of arrays."""
+        self.params_regimes = [
+            np.asarray(block, dtype=np.float64).ravel() for block in self.params_regimes
+        ]
+
+    # --- Per-regime parameter aliases ---
+
+    @property
+    def params_regime1(self) -> NDArray[np.float64]:
+        """AR parameters of regime 1."""
+        return self.params_regimes[0]
+
+    @property
+    def params_regime2(self) -> NDArray[np.float64]:
+        """AR parameters of regime 2."""
+        return self.params_regimes[1]
+
+    @property
+    def params_regime3(self) -> NDArray[np.float64] | None:
+        """AR parameters of regime 3 (None for two-regime models)."""
+        if len(self.params_regimes) < 3:
+            return None
+        return self.params_regimes[2]
 
     def summary(self) -> str:
         """Generate formatted summary table.
@@ -113,6 +146,7 @@ class ThresholdResults:
         lines.append(f"{'Log-Likelihood':>35}: {self.loglike:.4f}")
         lines.append(f"{'AIC':>35}: {self.aic:.4f}")
         lines.append(f"{'BIC':>35}: {self.bic:.4f}")
+        lines.append(f"{'Converged':>35}: {self.converged}")
         lines.append("-" * 70)
 
         # Threshold
@@ -289,8 +323,12 @@ class ThresholdResults:
         plt.tight_layout()
         return fig
 
-    def forecast(self, horizon: int = 10) -> dict[str, NDArray[np.float64]]:
-        """Generate forecasts using the fitted model.
+    def forecast(self, horizon: int = 10) -> NDArray[np.float64]:
+        """Generate point forecasts by deterministic (skeleton) iteration.
+
+        Each step uses the regime implied by the forecast path's own
+        transition variable, so every regime's coefficients are used where
+        the threshold variable calls for them.
 
         Parameters
         ----------
@@ -299,10 +337,43 @@ class ThresholdResults:
 
         Returns
         -------
-        dict
-            Dictionary with 'mean' forecast.
+        ndarray, shape (horizon,)
+            Point forecasts for t = T+1, ..., T+horizon.
         """
-        if self._model is not None:
-            return self._model.forecast(self, horizon)
-        msg = "Model reference not available for forecasting"
-        raise RuntimeError(msg)
+        if self._model is None:
+            msg = "Model reference not available for forecasting"
+            raise RuntimeError(msg)
+        return self._model.forecast(self, horizon)
+
+    def forecast_intervals(
+        self,
+        horizon: int = 10,
+        n_sims: int = 1000,
+        alpha: float = 0.05,
+        seed: int | None = None,
+    ) -> dict[str, NDArray[np.float64]]:
+        """Simulation-based forecast distribution (mean, intervals and paths).
+
+        Parameters
+        ----------
+        horizon : int
+            Number of steps ahead.
+        n_sims : int
+            Number of simulated future paths.
+        alpha : float
+            Two-sided interval level (0.05 -> 95% interval).
+        seed : int, optional
+            Random seed.
+
+        Returns
+        -------
+        dict
+            Keys 'mean', 'median', 'lower', 'upper' (each shape (horizon,))
+            and 'paths' (shape (n_sims, horizon)).
+        """
+        if self._model is None:
+            msg = "Model reference not available for forecasting"
+            raise RuntimeError(msg)
+        return self._model.forecast_intervals(
+            self, horizon=horizon, n_sims=n_sims, alpha=alpha, seed=seed
+        )

@@ -89,9 +89,9 @@ class TestLSTAR:
         results = model.fit()
 
         fc = results.forecast(horizon=10)
-        assert "mean" in fc
-        assert len(fc["mean"]) == 10
-        assert np.all(np.isfinite(fc["mean"])), "Forecast contains NaN/Inf"
+        assert isinstance(fc, np.ndarray)
+        assert fc.shape == (10,)
+        assert np.all(np.isfinite(fc)), "Forecast contains NaN/Inf"
 
     def test_lstar_summary(self) -> None:
         """summary() should return formatted string with gamma and c."""
@@ -126,3 +126,55 @@ class TestLSTAR:
         results = model.fit()
         assert np.isfinite(results.aic)
         assert np.isfinite(results.bic)
+
+
+class TestLSTARGammaScaling:
+    """Gamma is searched in units of 1/std(s) (audit finding #4)."""
+
+    def test_gamma_grid_is_scale_equivariant(self) -> None:
+        """Rescaling the data rescales gamma exactly, leaving G unchanged."""
+        y = _simulate_lstar(n=1500, gamma=5.0, c=0.0, seed=42)
+        base = LSTAR(y, order=1, delay=1, gamma_grid=20, c_grid=20).fit()
+        scaled = LSTAR(100.0 * y, order=1, delay=1, gamma_grid=20, c_grid=20).fit()
+
+        ratio = base.transition_params["gamma"] / scaled.transition_params["gamma"]
+        assert abs(ratio - 100.0) < 1e-6 * 100.0
+        assert np.allclose(base.transition_values, scaled.transition_values, atol=1e-8)
+        assert np.isclose(
+            scaled.transition_params["c"], 100.0 * base.transition_params["c"], rtol=1e-4
+        )
+
+    def test_gamma_bound_scales_with_data(self) -> None:
+        """The old hard cap of 500 is replaced by a scaled bound."""
+        from archbox.datasets import load_dataset
+
+        returns = load_dataset("sp500")["returns"].to_numpy()[:1500]
+        model = LSTAR(returns, order=1, delay=1, gamma_grid=15, c_grid=15)
+        # Return-scale data (std ~ 0.01) needs gamma far above the old cap.
+        assert model.gamma_max > 500.0
+        assert np.isclose(model.gamma_max, 500.0 / np.std(model._s))
+
+        results = model.fit()
+        assert results.transition_params["gamma"] > 500.0
+        assert np.isfinite(results.loglike)
+        assert np.all(np.isfinite(results.forecast(horizon=3)))
+
+    def test_converged_flag_present(self) -> None:
+        """The Nelder-Mead success flag is recorded on the results."""
+        y = _simulate_lstar(n=800, seed=42)
+        results = LSTAR(y, order=1, delay=1, gamma_grid=15, c_grid=15).fit()
+        assert isinstance(results.converged, bool)
+        assert results.converged
+        assert "Converged" in results.summary()
+
+    def test_no_refine_is_converged(self) -> None:
+        y = _simulate_lstar(n=500, seed=42)
+        results = LSTAR(y, order=1, delay=1, gamma_grid=15, c_grid=15, refine=False).fit()
+        assert results.converged
+
+    def test_refinement_never_worsens_the_fit(self) -> None:
+        """The refined (gamma, c) is kept only if it lowers the RSS."""
+        y = _simulate_lstar(n=800, gamma=5.0, seed=7)
+        refined = LSTAR(y, order=1, delay=1, gamma_grid=15, c_grid=15).fit()
+        grid_only = LSTAR(y, order=1, delay=1, gamma_grid=15, c_grid=15, refine=False).fit()
+        assert np.sum(refined.resid**2) <= np.sum(grid_only.resid**2) + 1e-8
