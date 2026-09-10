@@ -109,7 +109,7 @@ fig, axes = plt.subplots(2, 2, figsize=(12, 10))
 axes = axes.flatten()
 
 for ax, (name, res) in zip(axes, results.items()):
-    stats.probplot(res.resid, dist="norm", plot=ax)
+    stats.probplot(res.std_resid, dist="norm", plot=ax)
     ax.set_title(f"QQ-Plot: {name}")
     ax.grid(True, alpha=0.3)
 
@@ -130,7 +130,7 @@ O teste KS verifica se os residuos padronizados seguem a distribuicao assumida:
 from scipy import stats
 
 best_res = results[best_name]
-z = best_res.resid
+z = best_res.std_resid
 
 # Testar contra Normal padrao
 ks_stat, ks_pval = stats.kstest(z, 'norm')
@@ -209,7 +209,7 @@ for i, (name, res) in enumerate(ranking, 1):
 best_name, best_res = ranking[0]
 
 # ===== 4. Diagnosticos dos residuos =====
-z = best_res.resid
+z = best_res.std_resid
 
 print(f"\n--- Diagnosticos: {best_name} ---")
 print(f"  Curtose:    {stats.kurtosis(z, fisher=False):.4f}")

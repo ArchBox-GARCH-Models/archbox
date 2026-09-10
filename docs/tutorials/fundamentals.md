@@ -254,7 +254,7 @@ A good model should produce standardized residuals $z_t = \varepsilon_t / \sigma
 from archbox.diagnostics import ljung_box_squared
 
 # Standardized residuals
-z_t = results_normal.resid
+z_t = results_normal.std_resid
 
 # Ljung-Box on z_t^2 (remaining ARCH effects)
 lb_result = ljung_box_squared(z_t, lags=10)

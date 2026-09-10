@@ -199,7 +199,8 @@ print(forecast['volatility'])
 | `results.aic` | Criterio de Informacao de Akaike |
 | `results.bic` | Criterio de Informacao Bayesiano |
 | `results.conditional_volatility` | Serie de $\sigma_t$ |
-| `results.resid` | Residuos padronizados ($z_t = \epsilon_t / \sigma_t$) |
+| `results.resid` | Residuos crus $\epsilon_t = r_t - \mu$ (escala dos retornos) |
+| `results.std_resid` | Residuos padronizados ($z_t = \epsilon_t / \sigma_t$) |
 
 | Metodo | Descricao |
 |--------|-----------|
@@ -274,10 +275,10 @@ Apos estimar o GARCH, e essencial verificar se o modelo capturou adequadamente a
 Testa se ainda resta autocorrelacao serial nos residuos ao quadrado $z_t^2$. Rejeicao indica que o modelo nao capturou toda a dinamica ARCH.
 
 ```python
-from archbox.diagnostics import ljung_box_test
+from archbox.diagnostics import ljung_box_squared
 
 # Testar autocorrelacao em z_t^2
-lb_result = ljung_box_test(results.resid**2, lags=10)
+lb_result = ljung_box_squared(results.std_resid, lags=10)
 print(f"Ljung-Box Q(10): {lb_result.statistic:.4f}")
 print(f"p-valor: {lb_result.pvalue:.4f}")
 # p > 0.05 -> nao rejeita H0: sem autocorrelacao residual -> modelo OK
@@ -294,7 +295,7 @@ Testa a presenca de efeitos ARCH remanescentes nos residuos padronizados. Comple
 ```python
 from archbox.diagnostics import arch_lm_test
 
-lm_result = arch_lm_test(results.resid, lags=5)
+lm_result = arch_lm_test(results.std_resid, lags=5)
 print(f"ARCH-LM({5}): {lm_result.statistic:.4f}")
 print(f"p-valor: {lm_result.pvalue:.4f}")
 # p > 0.05 -> sem efeitos ARCH residuais -> modelo OK
@@ -309,7 +310,7 @@ import matplotlib.pyplot as plt
 from scipy import stats
 
 fig, ax = plt.subplots(figsize=(6, 6))
-stats.probplot(results.resid, dist="norm", plot=ax)
+stats.probplot(results.std_resid, dist="norm", plot=ax)
 ax.set_title("QQ-Plot: Residuos Padronizados vs. Normal")
 plt.tight_layout()
 plt.show()
@@ -326,7 +327,7 @@ Testa se choques positivos e negativos tem impacto diferente sobre a volatilidad
 ```python
 from archbox.diagnostics import sign_bias_test
 
-sb_result = sign_bias_test(results.resid)
+sb_result = sign_bias_test(results.resid, results.std_resid)
 print(sb_result)
 # Rejeicao -> considerar EGARCH ou GJR-GARCH
 ```
@@ -336,7 +337,7 @@ print(sb_result)
 ```python
 from archbox import GARCH
 from archbox.datasets import load_dataset
-from archbox.diagnostics import ljung_box_test, arch_lm_test, sign_bias_test
+from archbox.diagnostics import ljung_box_squared, arch_lm_test, sign_bias_test
 
 # 1. Estimar modelo
 sp500 = load_dataset('sp500')
@@ -344,11 +345,11 @@ model = GARCH(sp500['returns'], p=1, q=1)
 results = model.fit()
 
 # 2. Residuos padronizados
-z = results.resid
+z = results.std_resid
 
 # 3. Diagnosticos
 print("=== Ljung-Box (z^2) ===")
-lb = ljung_box_test(z**2, lags=10)
+lb = ljung_box_squared(z, lags=10)
 print(f"  Q(10) = {lb.statistic:.4f}, p = {lb.pvalue:.4f}")
 
 print("\n=== ARCH-LM ===")

@@ -273,13 +273,13 @@ A interpretacao e analoga ao DCC:
 ## Diagnosticos
 
 ```python
-from archbox.diagnostics import ljung_box_test
+from archbox.diagnostics import ljung_box_squared
 from archbox.multivariate.utils import is_positive_definite
 
 # 1. Residuos padronizados
 z = results.std_resids
 for i in range(z.shape[1]):
-    lb = ljung_box_test(z[:, i]**2, lags=10)
+    lb = ljung_box_squared(z[:, i], lags=10)
     print(f"Serie {i} - Ljung-Box Q(10): p={lb.pvalue:.4f}")
 
 # 2. Positiva-definitividade

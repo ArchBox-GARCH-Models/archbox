@@ -228,7 +228,8 @@ results.plot("components")
 | `results.conditional_volatility` | Serie de $\sigma_t$ (total) |
 | `results.long_run_component` | Serie de $q_t$ (tendencia) |
 | `results.short_run_component` | Serie de $\sigma_t^2 - q_t$ (transitorio) |
-| `results.resid` | Residuos padronizados |
+| `results.resid` | Residuos crus $\epsilon_t = r_t - \mu$ (escala dos retornos) |
+| `results.std_resid` | Residuos padronizados ($z_t = \epsilon_t / \sigma_t$) |
 
 | Metodo | Descricao |
 |--------|-----------|
@@ -305,9 +306,9 @@ print(f"{'Component GARCH preferido' if p_value < 0.05 else 'GARCH padrao sufici
 ### Ljung-Box nos Residuos Padronizados ao Quadrado
 
 ```python
-from archbox.diagnostics import ljung_box_test
+from archbox.diagnostics import ljung_box_squared
 
-lb_result = ljung_box_test(cgarch_res.resid**2, lags=10)
+lb_result = ljung_box_squared(cgarch_res.std_resid, lags=10)
 print(f"Ljung-Box Q(10): {lb_result.statistic:.4f}")
 print(f"p-valor: {lb_result.pvalue:.4f}")
 ```
@@ -317,7 +318,7 @@ print(f"p-valor: {lb_result.pvalue:.4f}")
 ```python
 from archbox.diagnostics import arch_lm_test
 
-lm_result = arch_lm_test(cgarch_res.resid, lags=5)
+lm_result = arch_lm_test(cgarch_res.std_resid, lags=5)
 print(f"ARCH-LM(5): {lm_result.statistic:.4f}")
 print(f"p-valor: {lm_result.pvalue:.4f}")
 ```
@@ -327,7 +328,7 @@ print(f"p-valor: {lm_result.pvalue:.4f}")
 ```python
 from archbox import ComponentGARCH
 from archbox.datasets import load_dataset
-from archbox.diagnostics import ljung_box_test, arch_lm_test
+from archbox.diagnostics import ljung_box_squared, arch_lm_test
 
 # 1. Estimar modelo
 sp500 = load_dataset('sp500')
@@ -335,11 +336,11 @@ model = ComponentGARCH(sp500['returns'])
 results = model.fit()
 
 # 2. Residuos padronizados
-z = results.resid
+z = results.std_resid
 
 # 3. Diagnosticos
 print("=== Ljung-Box (z^2) ===")
-lb = ljung_box_test(z**2, lags=10)
+lb = ljung_box_squared(z, lags=10)
 print(f"  Q(10) = {lb.statistic:.4f}, p = {lb.pvalue:.4f}")
 
 print("\n=== ARCH-LM ===")

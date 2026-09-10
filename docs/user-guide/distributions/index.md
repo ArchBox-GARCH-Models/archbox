@@ -60,10 +60,10 @@ res_t = model_t.fit()
 # Comparar QQ-plots
 fig, axes = plt.subplots(1, 2, figsize=(12, 5))
 
-stats.probplot(res_n.resid, dist="norm", plot=axes[0])
+stats.probplot(res_n.std_resid, dist="norm", plot=axes[0])
 axes[0].set_title("QQ-Plot: Normal")
 
-stats.probplot(res_t.resid, dist="norm", plot=axes[1])
+stats.probplot(res_t.std_resid, dist="norm", plot=axes[1])
 axes[1].set_title("QQ-Plot: Student-t")
 
 plt.tight_layout()

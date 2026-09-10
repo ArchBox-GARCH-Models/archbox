@@ -266,13 +266,13 @@ for i, univ in enumerate(results.univariate_results):
 
 ```python
 import numpy as np
-from archbox.diagnostics import ljung_box_test
+from archbox.diagnostics import ljung_box_squared
 from archbox.multivariate.utils import is_positive_definite
 
 # 1. Residuos dos fatores
 z = results.std_resids
 for i in range(z.shape[1]):
-    lb = ljung_box_test(z[:, i]**2, lags=10)
+    lb = ljung_box_squared(z[:, i], lags=10)
     print(f"Fator {i} - Ljung-Box Q(10): p={lb.pvalue:.4f}")
 
 # 2. Independencia dos fatores

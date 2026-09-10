@@ -32,7 +32,7 @@ This guide covers all the ways to install ArchBox and configure optional depende
 === "With Numba acceleration"
 
     ```bash
-    pip install garchbox[numba]
+    pip install "garchbox[numba]"
     ```
 
     !!! tip "Recommended for large datasets"
@@ -42,7 +42,7 @@ This guide covers all the ways to install ArchBox and configure optional depende
 === "All extras"
 
     ```bash
-    pip install garchbox[dev,docs]
+    pip install "garchbox[numba,dev,docs]"
     ```
 
 !!! note "Package name"
@@ -73,22 +73,33 @@ pip install garchbox
 Clone the repository and install in editable mode with development dependencies:
 
 ```bash
-git clone https://github.com/NodesEcon/archbox.git
+git clone https://github.com/ArchBox-GARCH-Models/archbox.git
 cd archbox
 pip install -e ".[dev]"
 ```
 
-This installs:
+The extras `garchbox` declares:
 
-| Extra  | Packages                             | Purpose              |
-|:-------|:-------------------------------------|:---------------------|
-| `dev`  | pytest, pytest-cov, ruff, pyright    | Testing and linting  |
-| `docs` | mkdocs-material, mkdocstrings, mike  | Documentation build  |
+| Extra   | Packages                                      | Purpose                       |
+|:--------|:----------------------------------------------|:------------------------------|
+| `numba` | numba >= 0.58                                 | JIT-accelerated inner loops   |
+| `dev`   | pytest, pytest-cov, ruff, pyright             | Testing and linting           |
+| `docs`  | mkdocs-material, mkdocstrings, pymdown-extensions, mike | Documentation build |
+
+These are the only extras `garchbox` declares. Anything else you see referenced
+(for example `garchbox[test]`) is not a real extra -- the test tooling lives in
+`dev`.
 
 To run the test suite after installing:
 
 ```bash
 pytest
+```
+
+Wall-clock benchmarks are excluded from the default run. To include them:
+
+```bash
+pytest tests/benchmarks -m benchmark -v -s
 ```
 
 To build and preview the documentation locally:
@@ -106,9 +117,9 @@ Then open [http://127.0.0.1:8000](http://127.0.0.1:8000) in your browser.
 
 | Package     | Install Command              | Purpose                                        |
 |:------------|:-----------------------------|:-----------------------------------------------|
-| numba       | `pip install garchbox[numba]` | JIT-compiled GARCH recursion, Hamilton filter  |
-| plotly      | `pip install plotly`          | Interactive volatility and correlation plots   |
-| jupyterlab  | `pip install jupyterlab`      | Run tutorials as notebooks                     |
+| numba       | `pip install "garchbox[numba]"` | JIT-compiled GARCH recursion, Hamilton filter, DCC recursion |
+| structlog   | `pip install structlog`         | Structured log records from `archbox._logging.configure_logging` |
+| jupyterlab  | `pip install jupyterlab`        | Run the tutorials in `examples/` as notebooks |
 
 ---
 
@@ -135,9 +146,9 @@ Expected output:
 
 ```text
 ArchBox version: 0.1.0
-Available datasets: ['sp500', 'ftse100', 'bitcoin', ...]
-SP500 dataset: 2769 observations
-Columns: ['returns']
+Available datasets: ['bitcoin', 'ftse100', 'fx_majors', 'ibovespa', ...]
+SP500 dataset: 2500 observations
+Columns: ['date', 'returns']
 ```
 
 !!! warning "Import name vs. package name"

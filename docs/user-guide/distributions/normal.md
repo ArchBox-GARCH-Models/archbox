@@ -129,7 +129,7 @@ results = model.fit()
 
 # QQ-plot dos residuos padronizados
 fig, ax = plt.subplots(figsize=(6, 6))
-stats.probplot(results.resid, dist="norm", plot=ax)
+stats.probplot(results.std_resid, dist="norm", plot=ax)
 ax.set_title("QQ-Plot: Residuos vs. Normal")
 plt.tight_layout()
 plt.show()
@@ -144,12 +144,12 @@ plt.show()
 from scipy import stats
 
 # Jarque-Bera test
-jb_stat, jb_pval = stats.jarque_bera(results.resid)
+jb_stat, jb_pval = stats.jarque_bera(results.std_resid)
 print(f"Jarque-Bera: {jb_stat:.4f}, p-valor: {jb_pval:.4f}")
 
 # Curtose e assimetria
-print(f"Curtose: {stats.kurtosis(results.resid, fisher=False):.4f}")
-print(f"Assimetria: {stats.skew(results.resid):.4f}")
+print(f"Curtose: {stats.kurtosis(results.std_resid, fisher=False):.4f}")
+print(f"Assimetria: {stats.skew(results.std_resid):.4f}")
 ```
 
 !!! note "Na pratica"

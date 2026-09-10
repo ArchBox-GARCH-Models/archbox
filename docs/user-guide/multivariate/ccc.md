@@ -244,12 +244,12 @@ Na pratica, a correlacao constante e uma hipotese razoavel quando:
 ## Diagnosticos
 
 ```python
-from archbox.diagnostics import ljung_box_test, engle_sheppard_test
+from archbox.diagnostics import ljung_box_squared, engle_sheppard_test
 
 # 1. Residuos padronizados: GARCH univariados capturam a dinamica?
 z = results.std_resids
 for i in range(z.shape[1]):
-    lb = ljung_box_test(z[:, i]**2, lags=10)
+    lb = ljung_box_squared(z[:, i], lags=10)
     print(f"Serie {i} - Ljung-Box Q(10): p={lb.pvalue:.4f}")
 
 # 2. Teste de correlacao constante

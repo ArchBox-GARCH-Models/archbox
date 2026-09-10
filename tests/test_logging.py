@@ -24,21 +24,33 @@ class TestGetLogger:
             logger = get_logger("mymodule")
             assert logger.name == "archbox.mymodule"
 
-    def test_get_logger_adds_handler_once(self) -> None:
-        """get_logger should not duplicate handlers on repeated calls."""
-        # Use a unique name to avoid interference
+    def test_get_logger_adds_no_handler(self) -> None:
+        """get_logger must not attach handlers to module loggers (library convention)."""
         name = "test_handler_dedup_unique"
         with patch("archbox._logging.HAS_STRUCTLOG", False):
             logger1 = get_logger(name)
-            n_handlers = len(logger1.handlers)
+            assert logger1.handlers == []
             logger2 = get_logger(name)
-            assert len(logger2.handlers) == n_handlers
+            assert logger2.handlers == []
 
-    def test_get_logger_sets_warning_level(self) -> None:
-        """Default log level should be WARNING."""
+    def test_get_logger_leaves_level_unset(self) -> None:
+        """Module loggers must inherit their level, not pin it to WARNING."""
         with patch("archbox._logging.HAS_STRUCTLOG", False):
             logger = get_logger("test_level_unique")
-            assert logger.level == logging.WARNING
+            assert logger.level == logging.NOTSET
+
+    def test_library_root_has_only_null_handler_by_default(self) -> None:
+        """Importing archbox must not install a StreamHandler on the library logger."""
+        root = logging.getLogger("archbox")
+        null_handlers = [h for h in root.handlers if isinstance(h, logging.NullHandler)]
+        assert null_handlers, "archbox root logger should carry a NullHandler"
+
+    def test_records_propagate_to_library_root(self) -> None:
+        """Module loggers propagate to 'archbox', so applications can capture them."""
+        with patch("archbox._logging.HAS_STRUCTLOG", False):
+            logger = get_logger("propagation_test_unique")
+        assert logger.propagate is True
+        assert logger.name.startswith("archbox.")
 
     @pytest.mark.skipif(not HAS_STRUCTLOG, reason="structlog not installed")
     def test_get_logger_with_structlog(self) -> None:
@@ -74,3 +86,12 @@ class TestConfigureLogging:
         """All standard logging levels should work."""
         for level in ["DEBUG", "INFO", "WARNING", "ERROR"]:
             configure_logging(level=level, use_structlog=False)
+
+    def test_configure_does_not_stack_handlers(self) -> None:
+        """Repeated configure_logging calls must not duplicate stream handlers."""
+        root = logging.getLogger("archbox")
+        configure_logging(level="INFO", use_structlog=False)
+        n_after_first = len(root.handlers)
+        configure_logging(level="DEBUG", use_structlog=False)
+        assert len(root.handlers) == n_after_first
+        assert root.level == logging.DEBUG

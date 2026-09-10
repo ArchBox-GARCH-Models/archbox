@@ -151,16 +151,23 @@ print(f"BIC: {results.bic:.4f}")
 
 A well-specified GARCH model should produce standardized residuals with no remaining ARCH effects. Let's verify:
 
+!!! warning "`resid` vs. `std_resid`"
+
+    `results.resid` holds the **raw** residuals $\varepsilon_t = r_t - \mu$, on
+    the same scale as the returns. `results.std_resid` holds the
+    **standardized** residuals $z_t = \varepsilon_t / \sigma_t$. Post-estimation
+    diagnostics test the standardized series, so pass `results.std_resid`.
+
 ```python
 from archbox.diagnostics import arch_lm_test, ljung_box_squared
 
 # ARCH-LM test on standardized residuals
-arch_lm = arch_lm_test(results.resid, lags=5)
+arch_lm = arch_lm_test(results.std_resid, lags=5)
 print(f"ARCH-LM statistic: {arch_lm.statistic:.4f}")
 print(f"ARCH-LM p-value:   {arch_lm.pvalue:.4f}")
 
 # Ljung-Box test on squared standardized residuals
-lb = ljung_box_squared(results.resid, lags=10)
+lb = ljung_box_squared(results.std_resid, lags=10)
 print(f"Ljung-Box statistic: {lb.statistic:.4f}")
 print(f"Ljung-Box p-value:   {lb.pvalue:.4f}")
 ```

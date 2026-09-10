@@ -267,14 +267,14 @@ print(f"Meia-vida dos choques na correlacao: {half_life:.1f} periodos")
 ### Verificacao dos Residuos Padronizados
 
 ```python
-from archbox.diagnostics import ljung_box_test, arch_lm_test
+from archbox.diagnostics import ljung_box_squared, arch_lm_test
 
 # Residuos padronizados multivariados
 z = results.std_resids  # shape: (T, k)
 
 # Testar cada serie individualmente
 for i in range(z.shape[1]):
-    lb = ljung_box_test(z[:, i]**2, lags=10)
+    lb = ljung_box_squared(z[:, i], lags=10)
     print(f"Serie {i} - Ljung-Box Q(10): {lb.statistic:.4f}, p={lb.pvalue:.4f}")
 ```
 

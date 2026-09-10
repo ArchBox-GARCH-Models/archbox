@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import matplotlib.pyplot as plt
 import pandas as pd
+
+if TYPE_CHECKING:  # pragma: no cover - typing only, keeps matplotlib off the import path
+    from matplotlib.axes import Axes
 
 
 @dataclass
@@ -77,22 +79,27 @@ class ComparisonResult:
     def plot_comparison(
         self,
         criterion: str = "aic",
-        ax: plt.Axes | None = None,
-    ) -> plt.Axes:
+        ax: Axes | None = None,
+    ) -> Axes:
         """Plot a bar chart comparing models by criterion.
+
+        matplotlib is imported here rather than at module scope so that
+        ``import archbox`` does not pay for the matplotlib import.
 
         Parameters
         ----------
         criterion : str
             Criterion to plot.
-        ax : plt.Axes, optional
+        ax : matplotlib.axes.Axes, optional
             Matplotlib axes.
 
         Returns
         -------
-        plt.Axes
+        matplotlib.axes.Axes
             Matplotlib axes with the plot.
         """
+        import matplotlib.pyplot as plt
+
         if ax is None:
             _, ax = plt.subplots(figsize=(10, 6))
 

@@ -374,7 +374,7 @@ print("Selected Models and Diagnostics")
 print("=" * 70)
 for asset_name in asset_names:
     model_name, res = best_models[asset_name]
-    z_t = res.resid
+    z_t = res.std_resid
 
     # Ljung-Box on squared standardized residuals
     lb = ljung_box_squared(z_t, lags=10)

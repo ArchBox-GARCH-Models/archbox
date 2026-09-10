@@ -9,7 +9,7 @@ description: Python library for ARCH/GARCH models, regime-switching, threshold/S
 
 **The complete Python toolkit for conditional volatility modeling.**
 
-[![CI](https://github.com/NodesEcon/archbox/actions/workflows/tests.yml/badge.svg)](https://github.com/NodesEcon/archbox/actions/workflows/tests.yml)
+[![CI](https://github.com/ArchBox-GARCH-Models/archbox/actions/workflows/ci.yml/badge.svg)](https://github.com/ArchBox-GARCH-Models/archbox/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/garchbox)](https://pypi.org/project/garchbox/)
 [![Python](https://img.shields.io/pypi/pyversions/garchbox)](https://pypi.org/project/garchbox/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -50,16 +50,17 @@ description: Python library for ARCH/GARCH models, regime-switching, threshold/S
     print(forecast)
     ```
 
-=== "DCC Multivariate (6 lines)"
+=== "DCC Multivariate (7 lines)"
 
     ```python
-    from archbox.multivariate import DCC
     from archbox.datasets import load_dataset
+    from archbox.multivariate import DCC
 
-    data = load_dataset("forex")
-    model = DCC(data, p=1, q=1)
+    fx = load_dataset("fx_majors")
+    returns = fx.drop(columns="date").to_numpy()
+    model = DCC(returns, univariate_model="GARCH", univariate_order=(1, 1))
     result = model.fit()
-    cov_matrix = result.conditional_covariance()
+    cov_t = result.dynamic_covariance   # (T, k, k)
     print(result.summary())
     ```
 
@@ -177,9 +178,9 @@ pip install garchbox
 With optional extras:
 
 ```bash
-pip install garchbox[dev]     # Development tools
-pip install garchbox[docs]    # Documentation tools
-pip install garchbox[test]    # Testing tools
+pip install "garchbox[numba]"   # JIT-accelerated recursions (optional)
+pip install "garchbox[dev]"     # pytest, pytest-cov, ruff, pyright
+pip install "garchbox[docs]"    # mkdocs-material, mkdocstrings, mike
 ```
 
 See the [Installation Guide](getting-started/installation.md) for detailed instructions.
@@ -263,7 +264,7 @@ If you use ArchBox in academic research, please cite:
   title = {ArchBox: Conditional Volatility Modeling for Python},
   author = {NodesEcon Development Team},
   year = {2026},
-  url = {https://github.com/NodesEcon/archbox},
+  url = {https://github.com/ArchBox-GARCH-Models/archbox},
   version = {0.1.0}
 }
 ```
