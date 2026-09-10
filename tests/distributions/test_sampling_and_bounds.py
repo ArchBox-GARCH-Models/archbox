@@ -56,9 +56,8 @@ class TestSimulateMatchesDensity:
         for x in (-1.5, -0.5, 0.0, 0.5, 1.5):
             empirical = float(np.mean(z < x))
             analytic = float(dist.cdf(x))
-            assert (
-                abs(empirical - analytic) < 0.01
-            ), f"{dist.name}: CDF({x}) empirical {empirical:.4f} vs analytic {analytic:.4f}"
+            msg = f"{dist.name}: CDF({x}) empirical {empirical:.4f} vs analytic {analytic:.4f}"
+            assert abs(empirical - analytic) < 0.01, msg
 
     def test_skewed_t_is_asymmetric_in_the_right_direction(self) -> None:
         """Negative lambda gives a left-skewed sample, positive lambda a right-skewed one.
