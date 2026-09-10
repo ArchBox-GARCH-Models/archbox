@@ -1,7 +1,10 @@
 """Performance benchmarks for archbox.
 
 These tests verify that model fitting completes within acceptable time limits.
-Run with: pytest tests/benchmarks/test_performance.py -v -s
+They are wall-clock sensitive, so they carry the ``benchmark`` marker and are
+deselected by the default ``addopts``. Run them explicitly with::
+
+    pytest tests/benchmarks -m benchmark -v -s
 """
 
 from __future__ import annotations
@@ -10,6 +13,8 @@ import time
 
 import numpy as np
 import pytest
+
+pytestmark = pytest.mark.benchmark
 
 
 def _time_it(func, *args, n_runs: int = 3, **kwargs) -> float:  # noqa: ANN002
@@ -26,7 +31,7 @@ def _time_it(func, *args, n_runs: int = 3, **kwargs) -> float:  # noqa: ANN002
 class TestGARCHPerformance:
     """GARCH performance benchmarks."""
 
-    def test_garch11_t1000_python(self) -> None:
+    def test_garch11_t1000_python(self, restore_backend: None) -> None:
         """GARCH(1,1) T=1000 without numba < 100ms."""
         from archbox.models.garch import GARCH
         from archbox.utils.backend import set_backend
@@ -41,13 +46,11 @@ class TestGARCHPerformance:
         print(f"\nGARCH(1,1) T=1000 python: {elapsed * 1000:.1f}ms")
         assert elapsed < 0.5, f"Too slow: {elapsed * 1000:.1f}ms > 500ms"
 
-        set_backend("auto")  # Reset
-
     @pytest.mark.skipif(
         not __import__("archbox.utils.numba_core", fromlist=["HAS_NUMBA"]).HAS_NUMBA,
         reason="numba not installed",
     )
-    def test_garch11_t1000_numba(self) -> None:
+    def test_garch11_t1000_numba(self, restore_backend: None) -> None:
         """GARCH(1,1) T=1000 with numba < 10ms."""
         from archbox.models.garch import GARCH
         from archbox.utils.backend import set_backend
@@ -65,13 +68,11 @@ class TestGARCHPerformance:
         print(f"\nGARCH(1,1) T=1000 numba: {elapsed * 1000:.1f}ms")
         assert elapsed < 0.01, f"Too slow: {elapsed * 1000:.1f}ms > 10ms"
 
-        set_backend("auto")
-
     @pytest.mark.skipif(
         not __import__("archbox.utils.numba_core", fromlist=["HAS_NUMBA"]).HAS_NUMBA,
         reason="numba not installed",
     )
-    def test_garch11_t10000_numba(self) -> None:
+    def test_garch11_t10000_numba(self, restore_backend: None) -> None:
         """GARCH(1,1) T=10000 with numba < 50ms."""
         from archbox.models.garch import GARCH
         from archbox.utils.backend import set_backend
@@ -88,8 +89,6 @@ class TestGARCHPerformance:
         elapsed = _time_it(model.fit, disp=False)
         print(f"\nGARCH(1,1) T=10000 numba: {elapsed * 1000:.1f}ms")
         assert elapsed < 0.05, f"Too slow: {elapsed * 1000:.1f}ms > 50ms"
-
-        set_backend("auto")
 
 
 class TestDCCPerformance:

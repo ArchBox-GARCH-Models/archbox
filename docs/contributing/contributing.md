@@ -11,9 +11,9 @@ Thank you for your interest in contributing to ArchBox! Whether you are reportin
 
 | Type | Where | Description |
 |------|-------|-------------|
-| Bug reports | [GitHub Issues](https://github.com/NodesEcon/archbox/issues) | Reproducible problem with expected vs. actual behavior |
-| Feature requests | [GitHub Issues](https://github.com/NodesEcon/archbox/issues) | Proposals with `[Feature]` label |
-| Code (PR) | [Pull Requests](https://github.com/NodesEcon/archbox/pulls) | New models, tests, bug fixes |
+| Bug reports | [GitHub Issues](https://github.com/ArchBox-GARCH-Models/archbox/issues) | Reproducible problem with expected vs. actual behavior |
+| Feature requests | [GitHub Issues](https://github.com/ArchBox-GARCH-Models/archbox/issues) | Proposals with `[Feature]` label |
+| Code (PR) | [Pull Requests](https://github.com/ArchBox-GARCH-Models/archbox/pulls) | New models, tests, bug fixes |
 | Documentation | `docs/` directory | Tutorials, API docs, examples |
 | Test additions | `tests/` directory | Unit, integration, and validation tests |
 
@@ -369,7 +369,7 @@ We especially welcome contributions in these areas:
 
 ## Reporting Issues
 
-File issues on [GitHub](https://github.com/NodesEcon/archbox/issues) with:
+File issues on [GitHub](https://github.com/ArchBox-GARCH-Models/archbox/issues) with:
 
 1. A clear title describing the problem
 2. **Minimal reproducible example** (MRE)
@@ -396,9 +396,9 @@ By contributing, you agree that your contributions will be licensed under the [M
 
 ## Questions?
 
-- **General questions**: [GitHub Discussions](https://github.com/NodesEcon/archbox/discussions)
-- **Bug reports**: [GitHub Issues](https://github.com/NodesEcon/archbox/issues)
-- **Feature requests**: [GitHub Issues](https://github.com/NodesEcon/archbox/issues) with `[Feature]` label
+- **General questions**: [GitHub Discussions](https://github.com/ArchBox-GARCH-Models/archbox/discussions)
+- **Bug reports**: [GitHub Issues](https://github.com/ArchBox-GARCH-Models/archbox/issues)
+- **Feature requests**: [GitHub Issues](https://github.com/ArchBox-GARCH-Models/archbox/issues) with `[Feature]` label
 
 ---
 

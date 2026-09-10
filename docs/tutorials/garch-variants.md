@@ -239,8 +239,8 @@ from archbox.diagnostics import sign_bias_test
 
 # Run sign bias test on GARCH residuals
 sb_result = sign_bias_test(
-    results_garch.resid * results_garch.conditional_volatility,  # raw residuals
-    results_garch.resid  # standardized residuals
+    results_garch.resid,      # raw residuals, eps_t
+    results_garch.std_resid,  # standardized residuals, z_t = eps_t / sigma_t
 )
 
 print("Sign Bias Test (GARCH(1,1) residuals)")

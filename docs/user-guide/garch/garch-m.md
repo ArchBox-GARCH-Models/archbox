@@ -216,7 +216,8 @@ print(f"Resultado: {'Rejeita H0 -> premio de risco significativo' if p_value < 0
 | `results.bic` | Criterio de Informacao Bayesiano |
 | `results.conditional_volatility` | Serie de $\sigma_t$ |
 | `results.conditional_mean` | Serie de $\mu + \lambda \sigma_t^{\delta}$ |
-| `results.resid` | Residuos padronizados |
+| `results.resid` | Residuos crus $\epsilon_t = r_t - \mu$ (escala dos retornos) |
+| `results.std_resid` | Residuos padronizados ($z_t = \epsilon_t / \sigma_t$) |
 
 | Metodo | Descricao |
 |--------|-----------|
@@ -278,15 +279,17 @@ print(f"Premio anualizado: {risk_premium_mean * 252:.2f}%")
 ### Ljung-Box nos Residuos Padronizados
 
 ```python
-from archbox.diagnostics import ljung_box_test
+from archbox.diagnostics import ljung_box_squared
 
-# Testar residuos (nao ao quadrado) para autocorrelacao na media
-lb_mean = ljung_box_test(garchm_res.resid, lags=10)
-print(f"Ljung-Box na media Q(10): {lb_mean.statistic:.4f}, p = {lb_mean.pvalue:.4f}")
-
-# Testar residuos ao quadrado para autocorrelacao na variancia
-lb_var = ljung_box_test(garchm_res.resid**2, lags=10)
+# ljung_box_squared testa z_t^2 (eleva ao quadrado internamente)
+lb_var = ljung_box_squared(garchm_res.std_resid, lags=10)
 print(f"Ljung-Box na variancia Q(10): {lb_var.statistic:.4f}, p = {lb_var.pvalue:.4f}")
+
+# Para autocorrelacao no NIVEL (equacao da media) a archbox nao tem teste
+# proprio; use statsmodels:
+from statsmodels.stats.diagnostic import acorr_ljungbox
+
+print(acorr_ljungbox(garchm_res.std_resid, lags=[10]))
 ```
 
 ### Teste ARCH-LM
@@ -294,7 +297,7 @@ print(f"Ljung-Box na variancia Q(10): {lb_var.statistic:.4f}, p = {lb_var.pvalue
 ```python
 from archbox.diagnostics import arch_lm_test
 
-lm_result = arch_lm_test(garchm_res.resid, lags=5)
+lm_result = arch_lm_test(garchm_res.std_resid, lags=5)
 print(f"ARCH-LM(5): {lm_result.statistic:.4f}")
 print(f"p-valor: {lm_result.pvalue:.4f}")
 ```
@@ -304,7 +307,8 @@ print(f"p-valor: {lm_result.pvalue:.4f}")
 ```python
 from archbox import GARCHM
 from archbox.datasets import load_dataset
-from archbox.diagnostics import ljung_box_test, arch_lm_test
+from archbox.diagnostics import ljung_box_squared, arch_lm_test
+from statsmodels.stats.diagnostic import acorr_ljungbox
 
 # 1. Estimar modelo
 sp500 = load_dataset('sp500')
@@ -312,15 +316,14 @@ model = GARCHM(sp500['returns'], p=1, q=1, delta=2)
 results = model.fit()
 
 # 2. Residuos padronizados
-z = results.resid
+z = results.std_resid
 
 # 3. Diagnosticos
-print("=== Ljung-Box (z) - media ===")
-lb_m = ljung_box_test(z, lags=10)
-print(f"  Q(10) = {lb_m.statistic:.4f}, p = {lb_m.pvalue:.4f}")
+print("=== Ljung-Box (z) - media (via statsmodels) ===")
+print(acorr_ljungbox(z, lags=[10]))
 
 print("\n=== Ljung-Box (z^2) - variancia ===")
-lb_v = ljung_box_test(z**2, lags=10)
+lb_v = ljung_box_squared(z, lags=10)
 print(f"  Q(10) = {lb_v.statistic:.4f}, p = {lb_v.pvalue:.4f}")
 
 print("\n=== ARCH-LM ===")

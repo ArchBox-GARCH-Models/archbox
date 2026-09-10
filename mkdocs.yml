@@ -1,8 +1,8 @@
 site_name: ArchBox
 site_description: Biblioteca de modelos ARCH/GARCH, volatilidade condicional, regime-switching e gestao de risco
 site_url: https://archbox.readthedocs.io
-repo_url: https://github.com/NodesEcon/archbox
-repo_name: NodesEcon/archbox
+repo_url: https://github.com/ArchBox-GARCH-Models/archbox
+repo_name: ArchBox-GARCH-Models/archbox
 
 theme:
   name: material
@@ -55,6 +55,11 @@ markdown_extensions:
   - pymdownx.highlight:
       anchor_linenums: true
   - pymdownx.details
+  - pymdownx.snippets:
+      # Allows docs pages to include files from the repository root,
+      # e.g. contributing/changelog.md pulls in the top-level CHANGELOG.md.
+      base_path: ['.', 'docs']
+      check_paths: true
   - pymdownx.tasklist:
       custom_checkbox: true
   - admonition
@@ -75,7 +80,7 @@ extra:
     provider: mike
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/NodesEcon/archbox
+      link: https://github.com/ArchBox-GARCH-Models/archbox
 
 nav:
   - Home: index.md
@@ -198,6 +203,7 @@ nav:
     - faq/troubleshooting.md
   - Benchmarks:
     - benchmarks/index.md
+    - Performance: benchmarks/performance.md
     - GARCH: benchmarks/garch.md
     - Multivariado: benchmarks/multivariate.md
     - Risco: benchmarks/risk.md

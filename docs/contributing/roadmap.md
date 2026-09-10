@@ -155,7 +155,7 @@ Exploratory features for future major releases.
 
 ### Feature Requests
 
-Open a [GitHub Issue](https://github.com/NodesEcon/archbox/issues) with the `[Feature]` label. Include:
+Open a [GitHub Issue](https://github.com/ArchBox-GARCH-Models/archbox/issues) with the `[Feature]` label. Include:
 
 1. **Use case**: What problem does it solve?
 2. **Description**: What should the feature do?

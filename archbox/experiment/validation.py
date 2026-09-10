@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-import matplotlib.pyplot as plt
 import numpy as np
 from numpy.typing import NDArray
+
+if TYPE_CHECKING:  # pragma: no cover - typing only, keeps matplotlib off the import path
+    from matplotlib.axes import Axes
 
 
 @dataclass
@@ -82,20 +85,22 @@ class ValidationResult:
 
     def plot_forecast_vs_actual(
         self,
-        ax: plt.Axes | None = None,
-    ) -> plt.Axes:
+        ax: Axes | None = None,
+    ) -> Axes:
         """Plot forecast volatility vs realized returns.
 
         Parameters
         ----------
-        ax : plt.Axes, optional
+        ax : matplotlib.axes.Axes, optional
             Matplotlib axes.
 
         Returns
         -------
-        plt.Axes
+        matplotlib.axes.Axes
             Matplotlib axes with the plot.
         """
+        import matplotlib.pyplot as plt
+
         if ax is None:
             _, ax = plt.subplots(figsize=(12, 6))
 

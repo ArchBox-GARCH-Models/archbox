@@ -344,48 +344,42 @@ where $\hat{L}$ is the maximized likelihood, $k$ is the number of parameters, an
 Instead of comparing models manually, use `ArchExperiment` to run a systematic comparison:
 
 ```python
-from archbox import GARCH, EGARCH, GJRGARCH
-from archbox.models import FIGARCH, APARCH
-from archbox.experiment import ArchExperiment
 from archbox.datasets import load_dataset
+from archbox.experiment import ArchExperiment
 
 returns = load_dataset("sp500")["returns"].to_numpy()
 
-# Define candidate models
-models = {
-    "GARCH(1,1)":     GARCH(returns, p=1, q=1),
-    "GARCH(2,1)":     GARCH(returns, p=2, q=1),
-    "EGARCH(1,1)":    EGARCH(returns, p=1, q=1),
-    "GJR-GARCH(1,1)": GJRGARCH(returns, p=1, q=1),
-    "APARCH(1,1)":    APARCH(returns, p=1, q=1),
-    "FIGARCH(1,d,1)": FIGARCH(returns, p=1, q=1),
-}
+# ArchExperiment takes the returns, then a list of (model_type, kwargs) specs
+experiment = ArchExperiment(returns)
+experiment.fit_all_models([
+    ("GARCH", {"p": 1, "q": 1}),
+    ("GARCH", {"p": 2, "q": 1}),
+    ("EGARCH", {"p": 1, "q": 1}),
+    ("GJR", {"p": 1, "q": 1}),
+    ("APARCH", {"p": 1, "q": 1}),
+    ("FIGARCH", {"p": 1, "q": 1}),
+])
 
-# Run experiment
-experiment = ArchExperiment(models)
-results = experiment.compare()
+comparison = experiment.compare_models()
 
-# Ranking by AIC
-print(results.ranking("aic"))
+# Ranking by AIC (a pandas DataFrame indexed by model name)
+print(comparison.ranking("aic"))
 
-# Full comparison table
-print(results.summary())
+# Name of the winner, and the full table
+print(comparison.best_model("aic"))
+print(comparison.to_dataframe())
 ```
 
-Expected output:
+Expected output (values will differ with your data):
 
 ```text
-Model Comparison (ranked by AIC)
-=================================================
-Rank  Model             AIC          BIC          LogLik
--------------------------------------------------
-1     EGARCH(1,1)       -16912.45    -16888.72    8460.23
-2     GJR-GARCH(1,1)    -16908.12    -16884.39    8458.06
-3     APARCH(1,1)       -16905.78    -16876.14    8458.89
-4     GARCH(1,1)        -16896.47    -16878.64    8451.24
-5     FIGARCH(1,d,1)    -16894.23    -16870.50    8451.12
-6     GARCH(2,1)        -16893.11    -16869.38    8450.56
-=================================================
+                           aic           bic       loglike  persistence
+EGARCH(1,1)-normal   -16912.45     -16888.72       8460.23        0.985
+GJR(1,1)-normal      -16908.12     -16884.39       8458.06        0.982
+APARCH(1,1)-normal   -16905.78     -16876.14       8458.89        0.981
+GARCH(1,1)-normal    -16896.47     -16878.64       8451.24        0.990
+FIGARCH(1,1)-normal  -16894.23     -16870.50       8451.12        0.996
+GARCH(2,1)-normal    -16893.11     -16869.38       8450.56        0.989
 ```
 
 ### Diagnostic Validation
@@ -404,12 +398,14 @@ After selecting a model, validate with diagnostic tests:
 from archbox.diagnostics import arch_lm_test, ljung_box_squared, sign_bias_test
 
 # Run diagnostics on the best model
-best = results.best_model("aic")
-resid = best.resid
+best = experiment.fitted_models[comparison.best_model("aic")]
 
-arch_lm = arch_lm_test(resid, lags=5)
-lb = ljung_box_squared(resid, lags=10)
-sb = sign_bias_test(resid)
+# `resid` is the RAW residual (return scale); `std_resid` is eps_t / sigma_t.
+# ARCH-LM and Ljung-Box test the standardized series; the Sign Bias test needs
+# both (raw residuals to build the sign indicators, standardized as regressand).
+arch_lm = arch_lm_test(best.std_resid, lags=5)
+lb = ljung_box_squared(best.std_resid, lags=10)
+sb = sign_bias_test(best.resid, best.std_resid)
 
 print(f"ARCH-LM p-value:   {arch_lm.pvalue:.4f}")
 print(f"Ljung-Box p-value: {lb.pvalue:.4f}")

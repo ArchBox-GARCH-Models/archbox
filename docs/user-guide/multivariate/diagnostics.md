@@ -7,7 +7,7 @@ description: "Testes de especificacao e avaliacao de modelos GARCH multivariados
 
 !!! info "Quick Reference"
     **Modulo:** `archbox.diagnostics` + `archbox.multivariate.utils`
-    **Import:** `from archbox.diagnostics import ljung_box_test, engle_sheppard_test`
+    **Import:** `from archbox.diagnostics import ljung_box_squared, engle_sheppard_test`
     **Complemento:** `from archbox.multivariate.utils import is_positive_definite`
 
 ## Overview
@@ -231,7 +231,7 @@ if min_eigenvalues.min() < 1e-10:
 Alem dos testes multivariados, e importante verificar cada serie individualmente:
 
 ```python
-from archbox.diagnostics import ljung_box_test, arch_lm_test
+from archbox.diagnostics import ljung_box_squared, arch_lm_test
 
 z = results.std_resids
 k = z.shape[1]
@@ -241,7 +241,7 @@ for i in range(k):
     zi = z[:, i]
 
     # Ljung-Box nos residuos ao quadrado
-    lb = ljung_box_test(zi**2, lags=10)
+    lb = ljung_box_squared(zi, lags=10)
 
     # ARCH-LM
     lm = arch_lm_test(zi, lags=5)
@@ -294,7 +294,7 @@ print(f"Curtose multivariada: stat={stat_kurt:.4f}, p={pval_kurt:.4f}")
 ```python
 import numpy as np
 from archbox.multivariate import DCC, CCC
-from archbox.diagnostics import ljung_box_test, arch_lm_test, engle_sheppard_test
+from archbox.diagnostics import ljung_box_squared, arch_lm_test, engle_sheppard_test
 from archbox.multivariate.utils import is_positive_definite
 
 # 1. Estimar modelo
@@ -312,7 +312,7 @@ print("=" * 60)
 print("\n--- Ljung-Box por Serie (z^2, lags=10) ---")
 all_ok = True
 for i in range(k):
-    lb = ljung_box_test(z[:, i]**2, lags=10)
+    lb = ljung_box_squared(z[:, i], lags=10)
     status = "OK" if lb.pvalue > 0.05 else "FALHA"
     if lb.pvalue <= 0.05:
         all_ok = False

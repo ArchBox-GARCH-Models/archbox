@@ -119,7 +119,7 @@ print(results.summary())
 ```python
 # Extract conditional volatility
 sigma_t = results.conditional_volatility
-z_t = results.resid  # standardized residuals
+z_t = results.std_resid  # standardized residuals
 
 print(f"Conditional volatility range: {sigma_t.min():.6f} to {sigma_t.max():.6f}")
 print(f"Annualized vol range: {sigma_t.min()*np.sqrt(252):.2%} to {sigma_t.max()*np.sqrt(252):.2%}")

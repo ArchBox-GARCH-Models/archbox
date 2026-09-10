@@ -1,7 +1,10 @@
 """Scaling tests for archbox.
 
 Verify that computation time scales correctly with problem size.
-Run with: pytest tests/benchmarks/test_scaling.py -v -s
+These are wall-clock sensitive, so they carry the ``benchmark`` marker and are
+deselected by the default ``addopts``. Run them explicitly with::
+
+    pytest tests/benchmarks/test_scaling.py -m benchmark -v -s
 """
 
 from __future__ import annotations
@@ -9,6 +12,9 @@ from __future__ import annotations
 import time
 
 import numpy as np
+import pytest
+
+pytestmark = pytest.mark.benchmark
 
 
 class TestGARCHScaling:

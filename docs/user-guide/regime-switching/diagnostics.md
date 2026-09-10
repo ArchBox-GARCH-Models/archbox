@@ -314,15 +314,16 @@ print(f"Std: {z_t.std():.4f}")
 ### Testes nos Residuos
 
 ```python
-from archbox.diagnostics import ljung_box_test, arch_lm_test
+from archbox.diagnostics import ljung_box_squared, arch_lm_test
 from scipy import stats
+from statsmodels.stats.diagnostic import acorr_ljungbox
 
-# Ljung-Box nos residuos
-lb = ljung_box_test(z_t, lags=10)
-print(f"Ljung-Box Q(10): {lb.statistic:.4f}, p={lb.pvalue:.4f}")
+# Ljung-Box no NIVEL dos residuos: a archbox so implementa a variante em z^2,
+# entao use statsmodels para o nivel.
+print(acorr_ljungbox(z_t, lags=[10]))
 
 # Ljung-Box nos residuos ao quadrado (ARCH effects)
-lb2 = ljung_box_test(z_t**2, lags=10)
+lb2 = ljung_box_squared(z_t, lags=10)
 print(f"Ljung-Box Q(10) em z^2: {lb2.statistic:.4f}, p={lb2.pvalue:.4f}")
 
 # ARCH-LM
@@ -405,8 +406,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from archbox.regime import MarkovSwitchingAR
 from archbox.datasets import load_dataset
-from archbox.diagnostics import ljung_box_test, arch_lm_test
+from archbox.diagnostics import ljung_box_squared, arch_lm_test
 from scipy import stats
+from statsmodels.stats.diagnostic import acorr_ljungbox
 
 # 1. Carregar e estimar
 gdp = load_dataset('us_gdp_quarterly')
@@ -456,13 +458,14 @@ for t in range(len(growth)):
     sigma_j = results.regime_params[j]['sigma']
     residuals[t] = (growth[t] - mu_j) / sigma_j
 
-lb = ljung_box_test(residuals, lags=10)
-lb2 = ljung_box_test(residuals**2, lags=10)
+lb = acorr_ljungbox(residuals, lags=[10])
+lb2 = ljung_box_squared(residuals, lags=10)
 lm = arch_lm_test(residuals, lags=5)
 jb_stat, jb_pval = stats.jarque_bera(residuals)
 
-print(f"  Ljung-Box Q(10):      {lb.statistic:.4f}  p={lb.pvalue:.4f}  "
-      f"{'OK' if lb.pvalue > 0.05 else 'FALHA'}")
+print(f"  Ljung-Box Q(10):      {lb['lb_stat'].iloc[0]:.4f}  "
+      f"p={lb['lb_pvalue'].iloc[0]:.4f}  "
+      f"{'OK' if lb['lb_pvalue'].iloc[0] > 0.05 else 'FALHA'}")
 print(f"  Ljung-Box Q(10) z^2:  {lb2.statistic:.4f}  p={lb2.pvalue:.4f}  "
       f"{'OK' if lb2.pvalue > 0.05 else 'FALHA'}")
 print(f"  ARCH-LM(5):           {lm.statistic:.4f}  p={lm.pvalue:.4f}  "

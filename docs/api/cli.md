@@ -7,9 +7,11 @@ description: Interface de linha de comando da archbox - estimate, risk, backtest
 
 !!! info "Instalacao"
     ```bash
-    pip install archbox
+    pip install garchbox
     ```
-    A CLI fica disponivel automaticamente apos a instalacao.
+    A distribuicao no PyPI chama-se `garchbox` (o pacote Python importado e
+    `archbox`). O executavel `archbox` fica disponivel automaticamente apos a
+    instalacao.
 
 ## Visao Geral
 
@@ -23,8 +25,12 @@ comuns sem necessidade de escrever codigo Python:
 | `archbox backtest` | Backtesting de VaR (Kupiec, Christoffersen) |
 | `archbox regime` | Ajustar modelo regime-switching |
 
-Todos os comandos aceitam dados via arquivo CSV e retornam resultados
-em formato JSON.
+Todos os comandos leem dados de um arquivo CSV e gravam os resultados em JSON.
+
+!!! warning "`--model` e `--data` sao obrigatorios"
+    Em **todos** os quatro subcomandos, `--model` e `--data` sao argumentos
+    obrigatorios: nao ha modelo default. Omitir qualquer um dos dois faz o
+    `argparse` encerrar com erro.
 
 ---
 
@@ -35,6 +41,9 @@ archbox <comando> [opcoes]
 ```
 
 ```bash
+# Versao
+archbox --version
+
 # Ajuda geral
 archbox --help
 
@@ -51,40 +60,41 @@ archbox estimate --help
       show_root_heading: true
       show_source: true
 
-Ajusta um modelo de volatilidade condicional e exibe os resultados.
+Ajusta um modelo de volatilidade condicional e grava os resultados.
 
 ### Sintaxe
 
 ```bash
-archbox estimate --data <arquivo.csv> --model <modelo> [opcoes]
+archbox estimate --model <modelo> --data <arquivo.csv> [opcoes]
 ```
 
 ### Opcoes
 
 | Flag | Tipo | Default | Descricao |
 |------|------|---------|-----------|
-| `--data` | `str` | -- | Caminho do arquivo CSV |
+| `--model` | `str` | **obrigatorio** | Tipo de modelo |
+| `--data` | `str` | **obrigatorio** | Caminho do arquivo CSV |
 | `--column` | `str` | `"returns"` | Nome da coluna de retornos |
-| `--model` | `str` | `"garch"` | Tipo de modelo |
-| `--p` | `int` | `1` | Ordem ARCH ($p$) |
-| `--q` | `int` | `1` | Ordem GARCH ($q$) |
+| `--p` | `int` | `1` | Ordem GARCH ($p$) |
+| `--q` | `int` | `1` | Ordem ARCH ($q$) |
 | `--dist` | `str` | `"normal"` | Distribuicao condicional |
-| `--mean` | `str` | `"constant"` | Especificacao da media |
-| `--output` | `str` | `None` | Arquivo JSON de saida |
+| `--mean` | `str` | `"constant"` | Especificacao da media (`constant` ou `zero`) |
+| `--variance-targeting` | flag | desligado | Fixa $\omega$ pela variancia amostral |
+| `--output` | `str` | `"results.json"` | Arquivo JSON de saida |
 
 ### Modelos Disponiveis
 
-| Valor `--model` | Classe | Descricao |
-|-----------------|--------|-----------|
+| Valor `--model` | Classe Python | Descricao |
+|-----------------|---------------|-----------|
 | `garch` | `GARCH` | GARCH(p,q) padrao |
 | `egarch` | `EGARCH` | EGARCH exponencial |
-| `gjr` | `GJR_GARCH` | GJR-GARCH assimetrico |
+| `gjr` | `GJRGARCH` | GJR-GARCH assimetrico |
 | `aparch` | `APARCH` | Asymmetric Power ARCH |
 | `figarch` | `FIGARCH` | GARCH fracionario |
 | `igarch` | `IGARCH` | GARCH integrado |
-| `garch-m` | `GARCH_M` | GARCH-in-Mean |
-| `component` | `ComponentGARCH` | GARCH de componente |
-| `har-rv` | `HAR_RV` | HAR-RV (volatilidade realizada) |
+| `garch-m` | `GARCHM` | GARCH-in-Mean |
+| `component` | `ComponentGARCH` | Component GARCH |
+| `har-rv` | `HARRV` | HAR-RV (volatilidade realizada) |
 
 ### Distribuicoes
 
@@ -92,44 +102,58 @@ archbox estimate --data <arquivo.csv> --model <modelo> [opcoes]
 |----------------|-----------|
 | `normal` | Normal padrao |
 | `student-t` | Student-$t$ |
-| `skew-t` | Skewed Student-$t$ |
+| `skewed-t` | Skewed Student-$t$ |
 | `ged` | Generalized Error Distribution |
+
+!!! note "`skewed-t`, nao `skew-t`"
+    O valor aceito e `skewed-t`. Qualquer outra grafia e rejeitada pelo
+    `argparse` com a lista de escolhas validas.
 
 ### Exemplos
 
 ```bash
 # GARCH(1,1) basico
-archbox estimate --data retornos.csv --model garch --p 1 --q 1
+archbox estimate --model garch --data retornos.csv --p 1 --q 1
 
 # EGARCH com distribuicao Student-t
-archbox estimate --data retornos.csv --model egarch --dist student-t
+archbox estimate --model egarch --data retornos.csv --dist student-t
 
 # GJR-GARCH(2,1) salvando resultado
-archbox estimate --data retornos.csv --model gjr --p 2 --q 1 \
+archbox estimate --model gjr --data retornos.csv --p 2 --q 1 \
     --output resultado.json
 
-# Especificar coluna
-archbox estimate --data dados.csv --column log_returns --model garch
+# Media zero + variance targeting
+archbox estimate --model garch --data retornos.csv \
+    --mean zero --variance-targeting
+
+# Especificar a coluna de retornos
+archbox estimate --model garch --data dados.csv --column log_returns
 ```
 
 ### Output JSON
 
 ```json
 {
-    "model": "GARCH(1,1)",
+    "model": "garch",
+    "p": 1,
+    "q": 1,
     "distribution": "normal",
-    "params": {
-        "omega": 1.23e-06,
-        "alpha": 0.085,
-        "beta": 0.905
+    "nobs": 2500,
+    "parameters": {
+        "omega": 1.29e-06,
+        "alpha[1]": 0.0773,
+        "beta[1]": 0.9155
     },
     "loglikelihood": 3456.78,
-    "aic": -6907.56,
-    "bic": -6891.23,
-    "persistence": 0.990,
-    "convergence": true
+    "aic": -6905.56,
+    "bic": -6882.27,
+    "persistence": 0.9928
 }
 ```
+
+As chaves de `parameters` sao `results.param_names`; distribuicoes nao-normais
+acrescentam seus proprios parametros ao final (por exemplo `nu` para Student-$t$,
+`nu` e `lambda` para skewed-$t$).
 
 ---
 
@@ -145,25 +169,33 @@ Calcula Value-at-Risk e Expected Shortfall.
 ### Sintaxe
 
 ```bash
-archbox risk --data <arquivo.csv> [opcoes]
+archbox risk --model <modelo> --data <arquivo.csv> [opcoes]
 ```
 
 ### Opcoes
 
 | Flag | Tipo | Default | Descricao |
 |------|------|---------|-----------|
-| `--data` | `str` | -- | Caminho do arquivo CSV |
+| `--model` | `str` | **obrigatorio** | Modelo de volatilidade |
+| `--data` | `str` | **obrigatorio** | Caminho do arquivo CSV |
 | `--column` | `str` | `"returns"` | Nome da coluna de retornos |
-| `--model` | `str` | `"garch"` | Modelo de volatilidade |
-| `--method` | `str` | `"parametric"` | Metodo de calculo do VaR |
-| `--alpha` | `float` | `0.05` | Nivel de significancia |
+| `--p` | `int` | `1` | Ordem GARCH ($p$) |
+| `--q` | `int` | `1` | Ordem ARCH ($q$) |
 | `--dist` | `str` | `"normal"` | Distribuicao condicional |
-| `--output` | `str` | `None` | Arquivo JSON de saida |
+| `--var-method` | `str` | `"parametric"` | Metodo de calculo do VaR |
+| `--alpha` | `float` | `0.05` | Nivel de significancia |
+| `--output` | `str` | `"risk.json"` | Arquivo JSON de saida |
+
+!!! warning "A flag chama-se `--var-method`"
+    Nao existe `--method` neste subcomando.
+
+`--model` aceita os mesmos valores de `estimate`, **exceto `har-rv`**:
+`garch`, `egarch`, `gjr`, `aparch`, `figarch`, `igarch`, `garch-m`, `component`.
 
 ### Metodos de VaR
 
-| Valor `--method` | Descricao |
-|------------------|-----------|
+| Valor `--var-method` | Descricao |
+|----------------------|-----------|
 | `parametric` | VaR parametrico (distribuicao assumida) |
 | `historical` | Simulacao historica |
 | `filtered-hs` | Simulacao historica filtrada (FHS) |
@@ -173,25 +205,26 @@ archbox risk --data <arquivo.csv> [opcoes]
 
 ```bash
 # VaR parametrico 95%
-archbox risk --data retornos.csv --alpha 0.05 --method parametric
+archbox risk --model garch --data retornos.csv --alpha 0.05 --var-method parametric
 
 # VaR 99% com simulacao historica filtrada
-archbox risk --data retornos.csv --alpha 0.01 --method filtered-hs
+archbox risk --model garch --data retornos.csv --alpha 0.01 --var-method filtered-hs
 
 # VaR Monte Carlo com distribuicao Student-t
-archbox risk --data retornos.csv --method monte-carlo --dist student-t
+archbox risk --model garch --data retornos.csv --var-method monte-carlo --dist student-t
 
 # Salvar resultado
-archbox risk --data retornos.csv --output risco.json
+archbox risk --model egarch --data retornos.csv --output risco.json
 ```
 
 ### Output JSON
 
 ```json
 {
+    "model": "garch",
     "method": "parametric",
     "alpha": 0.05,
-    "distribution": "normal",
+    "nobs": 2500,
     "var_last": -0.0156,
     "es_last": -0.0195,
     "var_mean": -0.0142,
@@ -215,46 +248,52 @@ Backtesting de VaR com testes de Kupiec e Christoffersen.
 ### Sintaxe
 
 ```bash
-archbox backtest --data <arquivo.csv> [opcoes]
+archbox backtest --model <modelo> --data <arquivo.csv> [opcoes]
 ```
 
 ### Opcoes
 
 | Flag | Tipo | Default | Descricao |
 |------|------|---------|-----------|
-| `--data` | `str` | -- | Caminho do arquivo CSV |
+| `--model` | `str` | **obrigatorio** | Modelo de volatilidade |
+| `--data` | `str` | **obrigatorio** | Caminho do arquivo CSV |
 | `--column` | `str` | `"returns"` | Nome da coluna de retornos |
-| `--model` | `str` | `"garch"` | Modelo de volatilidade |
-| `--method` | `str` | `"parametric"` | Metodo de VaR |
+| `--p` | `int` | `1` | Ordem GARCH ($p$) |
+| `--q` | `int` | `1` | Ordem ARCH ($q$) |
+| `--dist` | `str` | `"normal"` | Distribuicao condicional |
 | `--alpha` | `float` | `0.05` | Nivel de significancia |
-| `--output` | `str` | `None` | Arquivo JSON de saida |
+| `--window` | `int` | `250` | Tamanho da janela rolante |
+| `--output` | `str` | `"backtest.json"` | Arquivo JSON de saida |
+
+!!! note "Sem `--method` aqui"
+    O subcomando `backtest` nao aceita metodo de VaR; ele usa o modelo ajustado
+    e a janela definida por `--window`.
 
 ### Exemplos
 
 ```bash
 # Backtest basico
-archbox backtest --data retornos.csv
+archbox backtest --model garch --data retornos.csv
 
 # Backtest com VaR 99%
-archbox backtest --data retornos.csv --alpha 0.01
+archbox backtest --model garch --data retornos.csv --alpha 0.01
 
-# Backtest com EGARCH + FHS
-archbox backtest --data retornos.csv --model egarch --method filtered-hs
+# Backtest com EGARCH e janela de 500 observacoes
+archbox backtest --model egarch --data retornos.csv --window 500
 
 # Salvar resultado
-archbox backtest --data retornos.csv --output backtest.json
+archbox backtest --model garch --data retornos.csv --output backtest.json
 ```
 
 ### Output JSON
 
 ```json
 {
-    "model": "GARCH(1,1)",
-    "method": "parametric",
+    "model": "garch",
     "alpha": 0.05,
-    "n_observations": 1000,
-    "n_violations": 48,
-    "expected_violations": 50,
+    "window": 250,
+    "violations": 12,
+    "expected_violations": 12.5,
     "violation_ratio": 0.96,
     "kupiec": {
         "statistic": 0.082,
@@ -289,59 +328,66 @@ Ajusta modelo de regime-switching.
 ### Sintaxe
 
 ```bash
-archbox regime --data <arquivo.csv> --model <modelo> [opcoes]
+archbox regime --model <modelo> --data <arquivo.csv> [opcoes]
 ```
 
 ### Opcoes
 
 | Flag | Tipo | Default | Descricao |
 |------|------|---------|-----------|
-| `--data` | `str` | -- | Caminho do arquivo CSV |
+| `--model` | `str` | **obrigatorio** | Tipo de modelo regime-switching |
+| `--data` | `str` | **obrigatorio** | Caminho do arquivo CSV |
 | `--column` | `str` | `"returns"` | Nome da coluna |
-| `--model` | `str` | `"ms-mean"` | Tipo de modelo regime-switching |
-| `--n-regimes` | `int` | `2` | Numero de regimes |
-| `--ar-order` | `int` | `1` | Ordem AR (para MS-AR) |
-| `--output` | `str` | `None` | Arquivo JSON de saida |
+| `--k-regimes` | `int` | `2` | Numero de regimes |
+| `--order` | `int` | `1` | Ordem AR |
+| `--method` | `str` | `"em"` | Estimacao: `em` ou `mle` |
+| `--output` | `str` | `"regime.json"` | Arquivo JSON de saida |
+
+!!! warning "`--k-regimes` e `--order`"
+    Nao existem `--n-regimes` nem `--ar-order`.
 
 ### Modelos Disponiveis
 
-| Valor `--model` | Descricao |
-|-----------------|-----------|
-| `ms-mean` | Markov-Switching na media |
-| `ms-ar` | Markov-Switching AR |
-| `ms-var` | Markov-Switching na variancia |
-| `ms-garch` | Markov-Switching GARCH |
+| Valor `--model` | Classe Python | Descricao |
+|-----------------|---------------|-----------|
+| `ms-mean` | `MarkovSwitchingMean` | Markov-Switching na media |
+| `ms-ar` | `MarkovSwitchingAR` | Markov-Switching AR |
+| `ms-var` | `MarkovSwitchingVAR` | Markov-Switching VAR |
+| `ms-garch` | `MarkovSwitchingGARCH` | Markov-Switching GARCH |
 
 ### Exemplos
 
 ```bash
 # MS-Mean com 2 regimes
-archbox regime --data pib.csv --model ms-mean --n-regimes 2
+archbox regime --model ms-mean --data pib.csv --k-regimes 2
 
 # MS-AR(2) com 3 regimes
-archbox regime --data desemprego.csv --model ms-ar --ar-order 2 --n-regimes 3
+archbox regime --model ms-ar --data desemprego.csv --order 2 --k-regimes 3
 
-# MS-GARCH
-archbox regime --data retornos.csv --model ms-garch --output regime.json
+# MS-GARCH estimado por MLE
+archbox regime --model ms-garch --data retornos.csv --method mle --output regime.json
 ```
 
 ### Output JSON
 
 ```json
 {
-    "model": "MS-Mean(2)",
-    "n_regimes": 2,
+    "model": "ms-mean",
+    "k_regimes": 2,
+    "order": 1,
+    "method": "em",
+    "nobs": 250,
+    "loglikelihood": -456.78,
+    "aic": 925.56,
+    "bic": 948.12,
     "transition_matrix": [
         [0.975, 0.025],
         [0.035, 0.965]
     ],
     "regime_params": {
-        "regime_0": {"mu": 0.015, "sigma": 0.008},
-        "regime_1": {"mu": -0.005, "sigma": 0.022}
-    },
-    "loglikelihood": -456.78,
-    "aic": 925.56,
-    "bic": 948.12
+        "mu_0": 0.015,
+        "mu_1": -0.005
+    }
 }
 ```
 
@@ -370,27 +416,28 @@ date,returns
 
 ```bash
 # 1. Ajustar modelo
-archbox estimate --data retornos.csv --model egarch --output modelo.json
+archbox estimate --model egarch --data retornos.csv --output modelo.json
 
 # 2. Calcular risco
-archbox risk --data retornos.csv --model egarch --alpha 0.01 --output risco.json
+archbox risk --model egarch --data retornos.csv --alpha 0.01 --output risco.json
 
 # 3. Backtesting
-archbox backtest --data retornos.csv --model egarch --alpha 0.01 --output bt.json
+archbox backtest --model egarch --data retornos.csv --alpha 0.01 --output bt.json
 
 # 4. Regime-switching
-archbox regime --data retornos.csv --model ms-garch --output regime.json
+archbox regime --model ms-garch --data retornos.csv --output regime.json
 ```
 
 !!! tip "Integracao com scripts"
     Os outputs JSON facilitam integracao com pipelines de dados:
     ```bash
     # Processar com jq
-    archbox estimate --data ret.csv --model garch | jq '.persistence'
+    archbox estimate --model garch --data ret.csv --output ret.json
+    jq '.persistence' ret.json
 
     # Loop sobre modelos
     for model in garch egarch gjr; do
-        archbox estimate --data ret.csv --model $model --output ${model}.json
+        archbox estimate --model "$model" --data ret.csv --output "${model}.json"
     done
     ```
 

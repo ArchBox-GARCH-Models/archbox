@@ -256,7 +256,8 @@ def compute_realized_volatility(intraday_returns, freq='5min'):
 | `results.r_squared` | Coeficiente de determinacao $R^2$ |
 | `results.adj_r_squared` | $R^2$ ajustado |
 | `results.fvalue` | Estatistica F |
-| `results.resid` | Residuos |
+| `results.resid` | Residuos crus $\epsilon_t$ (escala da serie) |
+| `results.std_resid` | Residuos padronizados ($z_t = \epsilon_t / \sigma_t$) |
 | `results.fitted` | Valores ajustados ($\hat{RV}_t$) |
 
 | Metodo | Descricao |
@@ -309,20 +310,26 @@ O $R^2$ do HAR-RV e uma medida direta de quao previsivel e a volatilidade:
 ### Teste de Autocorrelacao nos Residuos
 
 ```python
-from archbox.diagnostics import ljung_box_test
+from archbox.diagnostics import ljung_box_squared
 
-lb_result = ljung_box_test(results.resid, lags=10)
-print(f"Ljung-Box Q(10): {lb_result.statistic:.4f}")
+# ljung_box_squared eleva a serie ao quadrado internamente:
+# passe os residuos padronizados z_t, nao z_t**2.
+lb_result = ljung_box_squared(results.std_resid, lags=10)
+print(f"Ljung-Box Q(10) em z_t^2: {lb_result.statistic:.4f}")
 print(f"p-valor: {lb_result.pvalue:.4f}")
-# p > 0.05 -> residuos nao autocorrelacionados
+# p > 0.05 -> sem efeitos ARCH remanescentes
 ```
+
+!!! note "Autocorrelacao no nivel dos residuos"
+    A archbox fornece apenas a variante em $z_t^2$. Para testar autocorrelacao
+    no **nivel** dos residuos use `statsmodels.stats.diagnostic.acorr_ljungbox`.
 
 ### Teste de Heterocedasticidade
 
 ```python
 from archbox.diagnostics import arch_lm_test
 
-lm_result = arch_lm_test(results.resid, lags=5)
+lm_result = arch_lm_test(results.std_resid, lags=5)
 print(f"ARCH-LM(5): {lm_result.statistic:.4f}")
 print(f"p-valor: {lm_result.pvalue:.4f}")
 ```
@@ -365,7 +372,7 @@ print(f"R^2 OOS: {r2_oos:.4f}")
 ```python
 from archbox import HARRV
 from archbox.datasets import load_dataset
-from archbox.diagnostics import ljung_box_test
+from archbox.diagnostics import ljung_box_squared
 
 # 1. Carregar dados
 rv_data = load_dataset('realized_volatility')
@@ -379,9 +386,9 @@ results = model.fit()
 print(results.summary())
 
 # 4. Diagnosticos
-z = results.resid
-print("\n=== Ljung-Box (residuos) ===")
-lb = ljung_box_test(z, lags=10)
+z = results.std_resid
+print("\n=== Ljung-Box (z^2) ===")
+lb = ljung_box_squared(z, lags=10)
 print(f"  Q(10) = {lb.statistic:.4f}, p = {lb.pvalue:.4f}")
 
 # 5. Previsao

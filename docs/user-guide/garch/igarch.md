@@ -195,7 +195,8 @@ print(forecast['volatility'])
 | `results.aic` | Criterio de Informacao de Akaike |
 | `results.bic` | Criterio de Informacao Bayesiano |
 | `results.conditional_volatility` | Serie de $\sigma_t$ |
-| `results.resid` | Residuos padronizados ($z_t = \epsilon_t / \sigma_t$) |
+| `results.resid` | Residuos crus $\epsilon_t = r_t - \mu$ (escala dos retornos) |
+| `results.std_resid` | Residuos padronizados ($z_t = \epsilon_t / \sigma_t$) |
 
 | Metodo | Descricao |
 |--------|-----------|
@@ -279,9 +280,9 @@ print(f"RiskMetrics lambda: 0.94 (fixo)")
 ### Ljung-Box nos Residuos Padronizados ao Quadrado
 
 ```python
-from archbox.diagnostics import ljung_box_test
+from archbox.diagnostics import ljung_box_squared
 
-lb_result = ljung_box_test(igarch_res.resid**2, lags=10)
+lb_result = ljung_box_squared(igarch_res.std_resid, lags=10)
 print(f"Ljung-Box Q(10): {lb_result.statistic:.4f}")
 print(f"p-valor: {lb_result.pvalue:.4f}")
 ```
@@ -291,7 +292,7 @@ print(f"p-valor: {lb_result.pvalue:.4f}")
 ```python
 from archbox.diagnostics import arch_lm_test
 
-lm_result = arch_lm_test(igarch_res.resid, lags=5)
+lm_result = arch_lm_test(igarch_res.std_resid, lags=5)
 print(f"ARCH-LM(5): {lm_result.statistic:.4f}")
 print(f"p-valor: {lm_result.pvalue:.4f}")
 ```
@@ -301,7 +302,7 @@ print(f"p-valor: {lm_result.pvalue:.4f}")
 ```python
 from archbox import IGARCH
 from archbox.datasets import load_dataset
-from archbox.diagnostics import ljung_box_test, arch_lm_test
+from archbox.diagnostics import ljung_box_squared, arch_lm_test
 
 # 1. Estimar modelo
 sp500 = load_dataset('sp500')
@@ -309,11 +310,11 @@ model = IGARCH(sp500['returns'], p=1, q=1)
 results = model.fit()
 
 # 2. Residuos padronizados
-z = results.resid
+z = results.std_resid
 
 # 3. Diagnosticos
 print("=== Ljung-Box (z^2) ===")
-lb = ljung_box_test(z**2, lags=10)
+lb = ljung_box_squared(z, lags=10)
 print(f"  Q(10) = {lb.statistic:.4f}, p = {lb.pvalue:.4f}")
 
 print("\n=== ARCH-LM ===")

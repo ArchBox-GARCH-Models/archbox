@@ -153,8 +153,15 @@ arch_lm_test(resids, lags=5) -> TestResult
 
 | Parametro | Tipo | Default | Descricao |
 |-----------|------|---------|-----------|
-| `resids` | `array-like` | -- | Residuos padronizados do modelo |
+| `resids` | `array-like` | -- | Serie de residuos. Para testar efeitos ARCH **remanescentes** apos o ajuste, passe os residuos padronizados (`results.std_resid`) |
 | `lags` | `int` | `5` | Numero de lags na regressao auxiliar |
+
+!!! warning "`resid` e cru, `std_resid` e padronizado"
+    A partir desta versao, `ArchResults.resid` guarda os residuos **crus**
+    $\varepsilon_t = r_t - \mu$ (na escala dos retornos) e
+    `ArchResults.std_resid` guarda os **padronizados**
+    $z_t = \varepsilon_t / \sigma_t$. Os diagnosticos pos-estimacao usam
+    `std_resid`.
 
 !!! tip "Interpretacao"
     - p-valor $> 0.05$: Modelo captura adequadamente os efeitos ARCH
@@ -173,8 +180,8 @@ returns = np.random.randn(1000) * 0.01
 model = GARCH(returns, p=1, q=1)
 result = model.fit(disp=False)
 
-# Teste ARCH-LM com 5 lags
-test = arch_lm_test(result.resid, lags=5)
+# Teste ARCH-LM com 5 lags nos residuos padronizados
+test = arch_lm_test(result.std_resid, lags=5)
 print(f"Estatistica: {test.statistic:.4f}")
 print(f"p-valor: {test.pvalue:.4f}")
 print(f"Conclusao: {'Sem efeitos ARCH' if test.pvalue > 0.05 else 'Efeitos ARCH presentes'}")
@@ -222,7 +229,7 @@ returns = np.random.randn(1000) * 0.01
 model = GARCH(returns, p=1, q=1)
 result = model.fit(disp=False)
 
-lb = ljung_box_squared(result.resid, lags=10)
+lb = ljung_box_squared(result.std_resid, lags=10)
 print(f"Q({lb.lags}) = {lb.statistic:.4f}, p-valor = {lb.pvalue:.4f}")
 ```
 
@@ -272,7 +279,8 @@ returns = np.random.randn(1000) * 0.01
 model = GARCH(returns, p=1, q=1)
 result = model.fit(disp=False)
 
-sb = sign_bias_test(result.resid, result.resid)
+# Residuos crus para os indicadores de sinal, padronizados como regressando
+sb = sign_bias_test(result.resid, result.std_resid)
 print(f"Sign Bias: t={sb.sign_bias[0]:.3f}, p={sb.sign_bias[1]:.4f}")
 print(f"Neg Sign Bias: t={sb.neg_sign_bias[0]:.3f}, p={sb.neg_sign_bias[1]:.4f}")
 print(f"Pos Sign Bias: t={sb.pos_sign_bias[0]:.3f}, p={sb.pos_sign_bias[1]:.4f}")
@@ -450,9 +458,9 @@ full_diagnostics(results, lags=10, arch_lm_lags=None, lb_lags=None) -> Diagnosti
 
 1. **ARCH-LM** em multiplos lags
 2. **Ljung-Box** em $z_t^2$ em multiplos lags
-3. **Sign Bias** (se residuos nao-padronizados disponiveis)
+3. **Sign Bias** (usa `results.resid` cru e `results.std_resid`)
 4. **Nyblom** (se scores disponiveis)
-5. **Jarque-Bera** para normalidade dos residuos
+5. **Jarque-Bera** para normalidade dos residuos padronizados
 
 ### Exemplo Completo
 

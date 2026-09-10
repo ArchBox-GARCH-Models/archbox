@@ -328,8 +328,8 @@ results = model.fit()
 print(results.summary())
 
 # ── 4. Diagnose ─────────────────────────────────────────
-arch_lm = arch_lm_test(results.resid, lags=5)
-lb = ljung_box_squared(results.resid, lags=10)
+arch_lm = arch_lm_test(results.std_resid, lags=5)
+lb = ljung_box_squared(results.std_resid, lags=10)
 
 print(f"ARCH-LM p-value:   {arch_lm.pvalue:.4f}")
 print(f"Ljung-Box p-value: {lb.pvalue:.4f}")

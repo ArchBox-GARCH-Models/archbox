@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import matplotlib.pyplot as plt
 import numpy as np
 from numpy.typing import NDArray
+
+if TYPE_CHECKING:  # pragma: no cover - typing only, keeps matplotlib off the import path
+    from matplotlib.axes import Axes
 
 
 @dataclass
@@ -62,8 +64,8 @@ class RiskAnalysisResult:
         self,
         method: str = "parametric",
         returns: NDArray[np.float64] | None = None,
-        ax: plt.Axes | None = None,
-    ) -> plt.Axes:
+        ax: Axes | None = None,
+    ) -> Axes:
         """Plot VaR and ES series.
 
         Parameters
@@ -72,14 +74,16 @@ class RiskAnalysisResult:
             VaR method to plot.
         returns : ndarray, optional
             Actual returns for overlay.
-        ax : plt.Axes, optional
+        ax : matplotlib.axes.Axes, optional
             Matplotlib axes.
 
         Returns
         -------
-        plt.Axes
+        matplotlib.axes.Axes
             Matplotlib axes with the plot.
         """
+        import matplotlib.pyplot as plt
+
         if method not in self.var_series:
             msg = f"Method '{method}' not found. Available: {list(self.var_series.keys())}"
             raise ValueError(msg)

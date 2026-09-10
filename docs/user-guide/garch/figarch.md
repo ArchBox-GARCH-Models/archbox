@@ -155,7 +155,7 @@ print(results.summary())
 ```python
 from archbox import FIGARCH, GARCH
 from archbox.datasets import load_dataset
-from archbox.diagnostics import ljung_box_test, arch_lm_test
+from archbox.diagnostics import ljung_box_squared, arch_lm_test
 
 # 1. Carregar dados
 sp500 = load_dataset('sp500')
@@ -181,8 +181,8 @@ print(f"  Estimado: memoria {'longa' if figarch_res.params['d'] > 0.1 else 'curt
 # 5. ACF dos residuos ao quadrado
 import numpy as np
 
-z_garch = garch_res.resid**2
-z_figarch = figarch_res.resid**2
+z_garch = garch_res.std_resid**2
+z_figarch = figarch_res.std_resid**2
 
 print("\nACF de residuos ao quadrado (lag 20):")
 print(f"  GARCH:   {np.corrcoef(z_garch[20:], z_garch[:-20])[0,1]:.4f}")
@@ -202,7 +202,8 @@ print(f"  FIGARCH: {np.corrcoef(z_figarch[20:], z_figarch[:-20])[0,1]:.4f}")
 | `results.aic` | Criterio de Informacao de Akaike |
 | `results.bic` | Criterio de Informacao Bayesiano |
 | `results.conditional_volatility` | Serie de $\sigma_t$ |
-| `results.resid` | Residuos padronizados ($z_t = \epsilon_t / \sigma_t$) |
+| `results.resid` | Residuos crus $\epsilon_t = r_t - \mu$ (escala dos retornos) |
+| `results.std_resid` | Residuos padronizados ($z_t = \epsilon_t / \sigma_t$) |
 
 | Metodo | Descricao |
 |--------|-----------|
@@ -254,8 +255,8 @@ garch_res = GARCH(returns, p=1, q=1).fit()
 figarch_res = FIGARCH(returns, p=1, q=1).fit()
 
 # ACF dos residuos ao quadrado
-z2_garch = garch_res.resid**2
-z2_figarch = figarch_res.resid**2
+z2_garch = garch_res.std_resid**2
+z2_figarch = figarch_res.std_resid**2
 
 print("Lag | ACF(GARCH) | ACF(FIGARCH)")
 print("----|------------|-------------")
@@ -284,9 +285,9 @@ for lag in [1, 5, 10, 20, 50]:
 ### Ljung-Box nos Residuos Padronizados ao Quadrado
 
 ```python
-from archbox.diagnostics import ljung_box_test
+from archbox.diagnostics import ljung_box_squared
 
-lb_result = ljung_box_test(figarch_res.resid**2, lags=20)
+lb_result = ljung_box_squared(figarch_res.std_resid, lags=20)
 print(f"Ljung-Box Q(20): {lb_result.statistic:.4f}")
 print(f"p-valor: {lb_result.pvalue:.4f}")
 # p > 0.05 -> modelo capturou a dinamica da variancia
@@ -297,7 +298,7 @@ print(f"p-valor: {lb_result.pvalue:.4f}")
 ```python
 from archbox.diagnostics import arch_lm_test
 
-lm_result = arch_lm_test(figarch_res.resid, lags=10)
+lm_result = arch_lm_test(figarch_res.std_resid, lags=10)
 print(f"ARCH-LM(10): {lm_result.statistic:.4f}")
 print(f"p-valor: {lm_result.pvalue:.4f}")
 ```
@@ -307,7 +308,7 @@ print(f"p-valor: {lm_result.pvalue:.4f}")
 ```python
 from archbox import FIGARCH
 from archbox.datasets import load_dataset
-from archbox.diagnostics import ljung_box_test, arch_lm_test
+from archbox.diagnostics import ljung_box_squared, arch_lm_test
 
 # 1. Estimar modelo
 sp500 = load_dataset('sp500')
@@ -315,11 +316,11 @@ model = FIGARCH(sp500['returns'], p=1, q=1)
 results = model.fit()
 
 # 2. Residuos padronizados
-z = results.resid
+z = results.std_resid
 
 # 3. Diagnosticos
 print("=== Ljung-Box (z^2) ===")
-lb = ljung_box_test(z**2, lags=20)
+lb = ljung_box_squared(z, lags=20)
 print(f"  Q(20) = {lb.statistic:.4f}, p = {lb.pvalue:.4f}")
 
 print("\n=== ARCH-LM ===")

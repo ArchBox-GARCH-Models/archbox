@@ -1,4 +1,12 @@
-# Performance Benchmarks
+---
+title: "Local Performance Benchmarks"
+description: "Wall-clock targets for the archbox benchmark suite and how to run it locally."
+---
+
+# Local Performance Benchmarks
+
+This page documents the wall-clock suite shipped in `tests/benchmarks/`. For the
+cross-library comparison see [Benchmarks Overview](index.md).
 
 ## Targets
 
@@ -14,16 +22,47 @@
 | Hamilton filter T=1000 k=2 | < 10ms | Numba |
 | VaR Monte Carlo 10K sims | < 5s | Auto |
 
+!!! warning "Targets are machine-dependent"
+    The numbers above were measured on the reference machine described in
+    [Benchmarks Overview](index.md). They are wall-clock assertions, so they can
+    fail on a loaded CI runner or a slower CPU without anything being wrong with
+    the library.
+
 ## Enabling Numba
+
+Numba is an optional extra:
+
+```bash
+pip install "garchbox[numba]"
+```
 
 ```python
 from archbox.utils.backend import set_backend
-set_backend('numba')
+
+set_backend("numba")   # 'auto' (default), 'numba', or 'python'
 ```
 
-## Running benchmarks
+## Running the benchmarks
+
+Benchmarks carry the `benchmark` pytest marker and are **deselected by default**
+(`addopts` in `pyproject.toml` contains `-m "not benchmark"`), so a normal
+`pytest` run never pays for them. Run them explicitly:
 
 ```bash
-pytest tests/benchmarks/test_performance.py -v -s
-pytest tests/benchmarks/test_scaling.py -v -s
+# The whole benchmark suite
+pytest tests/benchmarks -m benchmark -v -s
+
+# A single file
+pytest tests/benchmarks/test_performance.py -m benchmark -v -s
+pytest tests/benchmarks/test_scaling.py -m benchmark -v -s
+
+# Everything, benchmarks included
+pytest -m ""
 ```
+
+`-s` is what lets the per-scenario timings reach your terminal.
+
+!!! note "Backend isolation"
+    Benchmarks that force a backend use the `restore_backend` fixture, so a
+    failed timing assertion can no longer leave the process pinned to the
+    pure-Python (or numba) backend for the rest of the session.
