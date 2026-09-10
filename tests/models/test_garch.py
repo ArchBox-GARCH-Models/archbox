@@ -139,10 +139,30 @@ class TestGARCH11SP500:
         assert "Persistence" in s
 
     def test_residuals_standardized(self, fitted_garch):
-        """Standardized residuals should be ~N(0,1)."""
-        z = fitted_garch.resid
+        """`std_resid` holds the standardized residuals and is ~N(0,1)."""
+        z = fitted_garch.std_resid
         assert abs(np.mean(z)) < 0.1
         assert abs(np.std(z) - 1.0) < 0.2
+
+    def test_resid_is_raw(self, fitted_garch, sp500_returns):
+        """`resid` holds RAW residuals on the same scale as the returns."""
+        resid = fitted_garch.resid
+        assert resid.shape == sp500_returns.shape
+        # Demeaned returns: same standard deviation as the input series.
+        assert abs(np.std(resid) - np.std(sp500_returns)) / np.std(sp500_returns) < 0.01
+        np.testing.assert_allclose(resid, sp500_returns - fitted_garch.mu, rtol=1e-12)
+
+    def test_std_resid_equals_resid_over_sigma(self, fitted_garch):
+        """std_resid == resid / conditional_volatility by construction."""
+        np.testing.assert_allclose(
+            fitted_garch.std_resid,
+            fitted_garch.resid / fitted_garch.conditional_volatility,
+            rtol=1e-12,
+        )
+
+    def test_mu_is_the_model_mean(self, fitted_garch, sp500_returns):
+        """`mu` mirrors the fitted model mean."""
+        assert abs(fitted_garch.mu - float(np.mean(sp500_returns))) < 1e-12
 
     def test_to_dataframe(self, fitted_garch):
         df = fitted_garch.to_dataframe()

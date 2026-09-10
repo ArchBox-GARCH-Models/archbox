@@ -13,6 +13,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from archbox.core.volatility_model import VolatilityModel
+from archbox.utils.validation import validate_positive_integer
 
 
 class IGARCH(VolatilityModel):
@@ -141,3 +142,99 @@ class IGARCH(VolatilityModel):
     def num_params(self) -> int:
         """Number of model parameters (omega, alpha). beta = 1-alpha is implicit."""
         return 2
+
+    # --- Model-level moments and forecasts ---
+
+    def persistence(
+        self,
+        var_params: NDArray[np.float64],
+        dist_params: NDArray[np.float64] | None = None,
+    ) -> float:
+        """IGARCH persistence is exactly 1 by construction (beta = 1 - alpha).
+
+        Parameters
+        ----------
+        var_params : ndarray
+            Variance block ``[omega, alpha]`` (unused).
+        dist_params : ndarray, optional
+            Unused.
+
+        Returns
+        -------
+        float
+            Always ``1.0``.
+        """
+        del var_params, dist_params
+        return 1.0
+
+    def unconditional_variance(
+        self,
+        var_params: NDArray[np.float64],
+        dist_params: NDArray[np.float64] | None = None,
+    ) -> float:
+        """The IGARCH unconditional variance does not exist.
+
+        Parameters
+        ----------
+        var_params : ndarray
+            Variance block (unused).
+        dist_params : ndarray, optional
+            Unused.
+
+        Returns
+        -------
+        float
+            Always ``inf`` (persistence == 1).
+        """
+        del var_params, dist_params
+        return float("inf")
+
+    def forecast_variance(
+        self,
+        var_params: NDArray[np.float64],
+        resids: NDArray[np.float64],
+        sigma2: NDArray[np.float64],
+        horizon: int = 1,
+        dist_params: NDArray[np.float64] | None = None,
+    ) -> NDArray[np.float64]:
+        """Analytic IGARCH forecast.
+
+        The one-step forecast is the exact recursion
+        ``sigma^2_{T+1} = omega + alpha eps^2_T + (1-alpha) sigma^2_T``.
+        Because ``alpha + beta = 1`` and ``E[eps^2_{T+k}] = sigma^2_{T+k}``,
+        the multi-step recursion collapses to a linear drift:
+        ``sigma^2_{T+h} = omega * (h - 1) + sigma^2_{T+1}``.
+
+        Parameters
+        ----------
+        var_params : ndarray
+            Variance block ``[omega, alpha]``.
+        resids : ndarray
+            In-sample residuals.
+        sigma2 : ndarray
+            In-sample conditional variance path.
+        horizon : int
+            Number of steps ahead (>= 1).
+        dist_params : ndarray, optional
+            Unused.
+
+        Returns
+        -------
+        ndarray
+            Forecast variances, shape ``(horizon,)``, strictly increasing in h.
+        """
+        del dist_params
+        h_max = validate_positive_integer(horizon, "horizon")
+        params = np.asarray(var_params, dtype=np.float64)
+        omega = float(params[0])
+        alpha = float(params[1])
+        beta = 1.0 - alpha
+
+        sigma2_arr = np.maximum(np.asarray(sigma2, dtype=np.float64).ravel(), 1e-12)
+        resid_arr = np.asarray(resids, dtype=np.float64).ravel()
+        last_sigma2 = float(sigma2_arr[-1]) if sigma2_arr.size else self._backcast(self.endog)
+        last_eps2 = float(resid_arr[-1] ** 2) if resid_arr.size else last_sigma2
+
+        sigma2_next = max(omega + alpha * last_eps2 + beta * last_sigma2, 1e-12)
+        steps = np.arange(h_max, dtype=np.float64)
+        return np.maximum(sigma2_next + omega * steps, 1e-12)

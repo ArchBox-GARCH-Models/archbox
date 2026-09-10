@@ -10,11 +10,13 @@ where:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
+
+from archbox.utils.validation import validate_positive_integer, validate_realized_variance
 
 
 @dataclass
@@ -41,6 +43,12 @@ class HARRVResults:
         Fitted values.
     nobs : int
         Number of observations used in the regression.
+    rv_history : ndarray
+        Full realized-variance series the model was fitted on. Used to seed
+        the iterated forecast.
+    component_lags : list[int]
+        Averaging window (in days) of each HAR component, in the same order as
+        the slope coefficients.
     """
 
     params: NDArray[np.float64]
@@ -52,6 +60,8 @@ class HARRVResults:
     residuals: NDArray[np.float64]
     fitted_values: NDArray[np.float64]
     nobs: int
+    rv_history: NDArray[np.float64] = field(default_factory=lambda: np.zeros(0, dtype=np.float64))
+    component_lags: list[int] = field(default_factory=list)
 
     def summary(self) -> str:
         """Generate summary table."""
@@ -77,22 +87,47 @@ class HARRVResults:
         return "\n".join(lines)
 
     def forecast(self, horizon: int = 1) -> NDArray[np.float64]:
-        """Forecast realized variance.
+        """Iterated multi-step forecast of realized variance.
 
-        Simple iterative forecast using last available RV values.
+        The HAR regression is applied recursively: each forecast is appended to
+        the realized-variance history and the daily/weekly/monthly averages are
+        recomputed for the next step. Forecasts are floored at zero because
+        realized variance is non-negative by construction.
 
         Parameters
         ----------
         horizon : int
-            Number of steps ahead.
+            Number of steps ahead (>= 1).
 
         Returns
         -------
         ndarray
-            Forecast values.
+            Forecast values, shape ``(horizon,)``.
+
+        Raises
+        ------
+        ValueError
+            If ``horizon`` is not a positive integer, or the results object
+            carries no realized-variance history to iterate from.
         """
-        # Use last fitted value as base forecast
-        forecasts = np.full(horizon, self.fitted_values[-1])
+        h_max = validate_positive_integer(horizon, "horizon")
+        history = [float(v) for v in np.asarray(self.rv_history, dtype=np.float64).ravel()]
+        lags = [int(lag) for lag in self.component_lags]
+        if not history or not lags or len(history) < max(lags):
+            msg = (
+                "forecast() requires the realized-variance history used at fit time; "
+                "build the results with HARRV.fit()."
+            )
+            raise ValueError(msg)
+
+        forecasts = np.empty(h_max, dtype=np.float64)
+        for step in range(h_max):
+            regressors = [1.0]
+            regressors.extend(float(np.mean(history[-lag:])) for lag in lags)
+            value = float(np.dot(np.asarray(self.params, dtype=np.float64), regressors))
+            value = max(value, 0.0)
+            forecasts[step] = value
+            history.append(value)
         return forecasts
 
 
@@ -113,15 +148,23 @@ class HARRV:
         components: list[str] | None = None,
     ) -> None:
         """Initialize HAR-RV model with realized variance and components."""
-        self.rv = np.asarray(realized_variance, dtype=np.float64)
+        self.rv = validate_realized_variance(realized_variance, "realized_variance")
         if components is None:
             components = ["daily", "weekly", "monthly"]
-        self.components = components
         self._component_lags = {
             "daily": 1,
             "weekly": 5,
             "monthly": 22,
         }
+        unknown = [c for c in components if c not in self._component_lags]
+        if unknown:
+            known = ", ".join(self._component_lags)
+            msg = f"Unknown HAR components: {unknown}. Available: {known}."
+            raise ValueError(msg)
+        if not components:
+            msg = "components must contain at least one HAR component"
+            raise ValueError(msg)
+        self.components = list(components)
 
     def _build_regressors(self) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
         """Build the regression matrix and response vector.
@@ -211,4 +254,6 @@ class HARRV:
             residuals=resids,
             fitted_values=fitted,
             nobs=n,
+            rv_history=self.rv.copy(),
+            component_lags=[self._component_lags[c] for c in self.components],
         )

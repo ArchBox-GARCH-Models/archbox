@@ -60,13 +60,14 @@ def plot_volatility(
     with plt.rc_context(rc_params):
         fig_size = figsize or (theme.figure_size[0], theme.figure_size[1] * 1.2)
 
-        # Extract data from results
+        # `resid` holds RAW residuals (same scale as the returns); `std_resid`
+        # holds z_t = eps_t / sigma_t.
         returns: NDArray[np.float64] = np.asarray(results.resid, dtype=np.float64)
         sigma: NDArray[np.float64] = np.asarray(results.conditional_volatility, dtype=np.float64)
 
-        # Check for standardized residuals
-        if hasattr(results, "std_resid") and results.std_resid is not None:
-            std_resid: NDArray[np.float64] = np.asarray(results.std_resid, dtype=np.float64)
+        std_resid_attr = getattr(results, "std_resid", None)
+        if std_resid_attr is not None:
+            std_resid: NDArray[np.float64] = np.asarray(std_resid_attr, dtype=np.float64)
         else:
             std_resid = returns / np.maximum(sigma, 1e-12)
 
@@ -172,6 +173,36 @@ def plot_volatility(
         return fig
 
 
+def _extract_persistence(results: Any) -> float | None:
+    """Read the variance persistence off a results object, if available.
+
+    ``ArchResults.persistence`` is a method, while lightweight result
+    containers may expose a plain float. Both are accepted; anything that
+    cannot be turned into a finite float yields ``None`` so the plot simply
+    omits the theoretical ACF overlay.
+
+    Parameters
+    ----------
+    results : Any
+        Fitted model results.
+
+    Returns
+    -------
+    float or None
+        Finite persistence value, or ``None`` when unavailable.
+    """
+    value: Any = getattr(results, "persistence", None)
+    if value is None:
+        return None
+    try:
+        if callable(value):
+            value = value()
+        persistence = float(value)
+    except (TypeError, ValueError):
+        return None
+    return persistence if np.isfinite(persistence) else None
+
+
 def plot_variance_persistence(
     results: Any,
     max_lags: int = 50,
@@ -206,6 +237,8 @@ def plot_variance_persistence(
     with plt.rc_context(rc_params):
         fig_size = figsize or theme.figure_size
 
+        # Raw residuals: the ACF of squared *returns* is what GARCH persistence
+        # is compared against, so `resid` (raw) is the right series here.
         resids: NDArray[np.float64] = np.asarray(results.resid, dtype=np.float64)
         resids2 = resids**2
         resids2_demean = resids2 - np.mean(resids2)
@@ -221,14 +254,16 @@ def plot_variance_persistence(
                 cov = np.mean(resids2_demean[lag:] * resids2_demean[:-lag])
                 acf_vals[lag] = cov / var_r2 if var_r2 > 0 else 0.0
 
-        # Compute theoretical GARCH ACF if persistence available
-        persistence = getattr(results, "persistence", None)
-        if persistence is not None and 0 < persistence < 1:
-            theoretical_acf = persistence ** np.arange(max_lags + 1)
-            half_life = np.log(0.5) / np.log(persistence)
-        else:
-            theoretical_acf = None
-            half_life = None
+        # Compute theoretical GARCH ACF if persistence is available.
+        # `ArchResults.persistence` is a method; mocks/plain containers may
+        # expose it as a plain float, so accept both.
+        persistence = _extract_persistence(results)
+
+        theoretical_acf: NDArray[np.float64] | None = None
+        half_life: float | None = None
+        if persistence is not None and 0.0 < persistence < 1.0:
+            theoretical_acf = np.asarray(persistence ** np.arange(max_lags + 1), dtype=np.float64)
+            half_life = float(np.log(0.5) / np.log(persistence))
 
         # Significance bounds
         sig_bound = 1.96 / np.sqrt(t_len)

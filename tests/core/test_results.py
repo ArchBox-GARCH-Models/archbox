@@ -147,6 +147,50 @@ class TestArchResults:
     def test_resid_shape(self, mock_results: ArchResults):
         assert mock_results.resid.shape == (500,)
 
+    def test_resid_is_raw(self, mock_results: ArchResults):
+        """`resid` mirrors model.endog (raw, demeaned returns)."""
+        np.testing.assert_allclose(mock_results.resid, mock_results._model.endog, rtol=1e-12)
+
+    def test_std_resid_is_standardized(self, mock_results: ArchResults):
+        """`std_resid` is resid / conditional_volatility."""
+        assert mock_results.std_resid.shape == (500,)
+        np.testing.assert_allclose(
+            mock_results.std_resid,
+            mock_results.resid / mock_results.conditional_volatility,
+            rtol=1e-12,
+        )
+        # Raw and standardized residuals live on very different scales.
+        assert mock_results.std_resid.std() > 10 * mock_results.resid.std()
+
+    def test_mu_exposed(self, mock_results: ArchResults):
+        """`mu` is the model mean."""
+        assert mock_results.mu == pytest.approx(mock_results._model.mu)
+
+    def test_persistence_delegates_to_model(self, mock_results: ArchResults):
+        """persistence() must call the model, not re-derive a GARCH layout."""
+        expected = mock_results._model.persistence(mock_results.params[:3])
+        assert mock_results.persistence() == pytest.approx(expected)
+
+    def test_unconditional_variance_delegates_to_model(self, mock_results: ArchResults):
+        expected = mock_results._model.unconditional_variance(mock_results.params[:3])
+        assert mock_results.unconditional_variance() == pytest.approx(expected)
+
+    def test_forecast_delegates_to_model(self, mock_results: ArchResults):
+        """forecast() must equal the model-level forecast_variance."""
+        expected = mock_results._model.forecast_variance(
+            mock_results.params[:3],
+            mock_results.resid,
+            mock_results._sigma2,
+            7,
+        )
+        np.testing.assert_allclose(
+            mock_results.forecast(horizon=7)["variance"], expected, rtol=1e-12
+        )
+
+    def test_forecast_rejects_bad_horizon(self, mock_results: ArchResults):
+        with pytest.raises(ValueError, match="horizon"):
+            mock_results.forecast(horizon=0)
+
     def test_to_dataframe(self, mock_results: ArchResults):
         df = mock_results.to_dataframe()
         assert list(df.columns) == ["estimate", "std_err", "t_value", "p_value"]

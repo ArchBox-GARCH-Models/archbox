@@ -11,6 +11,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from archbox.core.volatility_model import VolatilityModel
+from archbox.utils.validation import validate_positive_integer
 
 
 class APARCH(VolatilityModel):
@@ -41,8 +42,9 @@ class APARCH(VolatilityModel):
         dist: str = "normal",
     ) -> None:
         """Initialize APARCH model with lag orders and options."""
-        self.p = p
-        self.q = q
+        self.p = validate_positive_integer(p, "p")
+        self.q = validate_positive_integer(q, "q")
+        self._innovation_cache: dict[tuple[float, ...], NDArray[np.float64]] = {}
         super().__init__(endog, mean=mean, dist=dist)
 
     def _variance_recursion(
@@ -198,3 +200,198 @@ class APARCH(VolatilityModel):
     def num_params(self) -> int:
         """Number of model parameters: omega + q alphas + q gammas + p betas + delta."""
         return 1 + 2 * self.q + self.p + 1
+
+    # --- Model-level moments and forecasts ---
+
+    #: Monte-Carlo settings (fixed for reproducibility).
+    FORECAST_PATHS: int = 10_000
+    FORECAST_SEED: int = 20240101
+    KAPPA_DRAWS: int = 200_000
+    KAPPA_SEED: int = 20240102
+
+    def _aparch_blocks(
+        self, var_params: NDArray[np.float64]
+    ) -> tuple[float, NDArray[np.float64], NDArray[np.float64], NDArray[np.float64], float]:
+        """Split the parameter vector into (omega, alphas, gammas, betas, delta)."""
+        params = np.asarray(var_params, dtype=np.float64)
+        omega = float(params[0])
+        alphas = params[1 : 1 + self.q]
+        gammas = params[1 + self.q : 1 + 2 * self.q]
+        betas = params[1 + 2 * self.q : 1 + 2 * self.q + self.p]
+        delta = float(params[1 + 2 * self.q + self.p])
+        return omega, alphas, gammas, betas, max(delta, 1e-6)
+
+    def _innovation_sample(
+        self, dist_params: NDArray[np.float64] | None = None
+    ) -> NDArray[np.float64]:
+        """Fixed-seed sample of standardized innovations, cached per shape vector.
+
+        Parameters
+        ----------
+        dist_params : ndarray, optional
+            Fitted distribution shape parameters.
+
+        Returns
+        -------
+        ndarray
+            ``KAPPA_DRAWS`` deterministic draws z_t ~ D(0, 1).
+        """
+        key: tuple[float, ...] = ()
+        if dist_params is not None:
+            key = tuple(float(v) for v in np.asarray(dist_params, dtype=np.float64).ravel())
+        cached = self._innovation_cache.get(key)
+        if cached is None:
+            rng = np.random.default_rng(self.KAPPA_SEED)
+            cached = self._simulate_innovations(self.KAPPA_DRAWS, rng, dist_params)
+            self._innovation_cache[key] = cached
+        return cached
+
+    def _kappa(
+        self,
+        gamma: float,
+        delta: float,
+        dist_params: NDArray[np.float64] | None = None,
+    ) -> float:
+        """Compute ``E[(|z| - gamma z)^delta]`` for the fitted innovation law.
+
+        Evaluated by fixed-seed Monte-Carlo over ``KAPPA_DRAWS`` draws, so the
+        value is deterministic for a given (gamma, delta, distribution).
+
+        Parameters
+        ----------
+        gamma : float
+            Leverage coefficient, |gamma| < 1.
+        delta : float
+            Power parameter.
+        dist_params : ndarray, optional
+            Fitted distribution shape parameters.
+
+        Returns
+        -------
+        float
+            The expectation, a strictly positive finite number.
+        """
+        z = self._innovation_sample(dist_params)
+        base = np.maximum(np.abs(z) - gamma * z, 0.0)
+        value = float(np.mean(base**delta))
+        return value if np.isfinite(value) else 0.0
+
+    def persistence(
+        self,
+        var_params: NDArray[np.float64],
+        dist_params: NDArray[np.float64] | None = None,
+    ) -> float:
+        """APARCH persistence ``sum_i alpha_i E[(|z|-gamma_i z)^delta] + sum(beta)``.
+
+        Parameters
+        ----------
+        var_params : ndarray
+            Variance block ``[omega, alpha.., gamma.., beta.., delta]``.
+        dist_params : ndarray, optional
+            Fitted distribution shape parameters used for the expectation.
+
+        Returns
+        -------
+        float
+            Persistence of the sigma^delta recursion.
+        """
+        _, alphas, gammas, betas, delta = self._aparch_blocks(var_params)
+        arch = 0.0
+        for i in range(self.q):
+            arch += float(alphas[i]) * self._kappa(float(gammas[i]), delta, dist_params)
+        return float(arch + np.sum(betas))
+
+    def unconditional_variance(
+        self,
+        var_params: NDArray[np.float64],
+        dist_params: NDArray[np.float64] | None = None,
+    ) -> float:
+        """Long-run variance ``(omega / (1 - persistence))^(2/delta)``.
+
+        Parameters
+        ----------
+        var_params : ndarray
+            Variance block.
+        dist_params : ndarray, optional
+            Fitted distribution shape parameters.
+
+        Returns
+        -------
+        float
+            Long-run variance, or ``inf`` when persistence >= 1.
+        """
+        pers = self.persistence(var_params, dist_params)
+        if not np.isfinite(pers) or pers >= 1.0:
+            return float("inf")
+        omega, _, _, _, delta = self._aparch_blocks(var_params)
+        sigma_delta_inf = omega / (1.0 - pers)
+        if sigma_delta_inf <= 0.0:
+            return float("inf")
+        return float(sigma_delta_inf ** (2.0 / delta))
+
+    def forecast_variance(
+        self,
+        var_params: NDArray[np.float64],
+        resids: NDArray[np.float64],
+        sigma2: NDArray[np.float64],
+        horizon: int = 1,
+        dist_params: NDArray[np.float64] | None = None,
+    ) -> NDArray[np.float64]:
+        """Multi-step APARCH variance forecast by Monte-Carlo simulation.
+
+        APARCH has no closed-form multi-step forecast because the power
+        transform ``sigma^delta -> sigma^2`` is non-linear, so the forecast is
+        obtained by **Monte-Carlo simulation with a fixed seed**
+        (``FORECAST_PATHS`` paths, seed ``FORECAST_SEED``). The one-step value
+        is exact: every input is observed, so all paths coincide at h = 1.
+
+        Parameters
+        ----------
+        var_params : ndarray
+            Variance block ``[omega, alpha.., gamma.., beta.., delta]``.
+        resids : ndarray
+            In-sample residuals.
+        sigma2 : ndarray
+            In-sample conditional variance path.
+        horizon : int
+            Number of steps ahead (>= 1).
+        dist_params : ndarray, optional
+            Fitted distribution shape parameters used to draw innovations.
+
+        Returns
+        -------
+        ndarray
+            Forecast variances, shape ``(horizon,)``.
+        """
+        h_max = validate_positive_integer(horizon, "horizon")
+        omega, alphas, gammas, betas, delta = self._aparch_blocks(var_params)
+
+        sigma2_arr = np.maximum(np.asarray(sigma2, dtype=np.float64).ravel(), 1e-12)
+        resid_arr = np.asarray(resids, dtype=np.float64).ravel()
+        fill = float(sigma2_arr[-1]) if sigma2_arr.size else self._backcast(self.endog)
+
+        n_paths = int(self.FORECAST_PATHS)
+        rng = np.random.default_rng(self.FORECAST_SEED)
+
+        sd_tail = self._tail(sigma2_arr, self.p, fill) ** (delta / 2.0)
+        e_tail = self._tail(resid_arr, self.q, 0.0)
+        sd_hist = [np.full(n_paths, v, dtype=np.float64) for v in sd_tail]
+        e_hist = [np.full(n_paths, v, dtype=np.float64) for v in e_tail]
+
+        out = np.empty(h_max, dtype=np.float64)
+        for h in range(h_max):
+            sd_next = np.full(n_paths, omega, dtype=np.float64)
+            for i in range(self.q):
+                e_lag = e_hist[-1 - i]
+                shock = np.maximum(np.abs(e_lag) - gammas[i] * e_lag, 0.0)
+                sd_next += alphas[i] * shock**delta
+            for j in range(self.p):
+                sd_next += betas[j] * sd_hist[-1 - j]
+            sd_next = np.maximum(sd_next, 1e-300)
+            sigma2_next = sd_next ** (2.0 / delta)
+            sigma2_next = np.where(np.isfinite(sigma2_next), sigma2_next, 1e-12)
+            out[h] = max(float(np.mean(sigma2_next)), 1e-12)
+            sd_hist.append(sd_next)
+            z_new = self._simulate_innovations(n_paths, rng, dist_params)
+            e_hist.append(z_new * np.sqrt(np.maximum(sigma2_next, 1e-12)))
+        return out

@@ -13,6 +13,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from archbox.core.volatility_model import VolatilityModel
+from archbox.utils.validation import validate_positive_integer
 
 
 class GJRGARCH(VolatilityModel):
@@ -43,8 +44,8 @@ class GJRGARCH(VolatilityModel):
         dist: str = "normal",
     ) -> None:
         """Initialize GJR-GARCH model with lag orders and options."""
-        self.p = p
-        self.q = q
+        self.p = validate_positive_integer(p, "p")
+        self.q = validate_positive_integer(q, "q")
         super().__init__(endog, mean=mean, dist=dist)
 
     def _variance_recursion(
@@ -194,3 +195,113 @@ class GJRGARCH(VolatilityModel):
     def num_params(self) -> int:
         """Number of model parameters."""
         return 1 + 2 * self.q + self.p
+
+    # --- Model-level moments and forecasts ---
+
+    def _gjr_blocks(
+        self, var_params: NDArray[np.float64]
+    ) -> tuple[float, NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
+        """Split the parameter vector into (omega, alphas, gammas, betas)."""
+        params = np.asarray(var_params, dtype=np.float64)
+        omega = float(params[0])
+        alphas = params[1 : 1 + self.q]
+        gammas = params[1 + self.q : 1 + 2 * self.q]
+        betas = params[1 + 2 * self.q : 1 + 2 * self.q + self.p]
+        return omega, alphas, gammas, betas
+
+    def persistence(
+        self,
+        var_params: NDArray[np.float64],
+        dist_params: NDArray[np.float64] | None = None,
+    ) -> float:
+        """GJR persistence ``sum(alpha) + sum(gamma)/2 + sum(beta)``.
+
+        With symmetric innovations ``E[z^2 1{z<0}] = 1/2``, so the leverage
+        term contributes half of each gamma.
+
+        Parameters
+        ----------
+        var_params : ndarray
+            Variance block ``[omega, alpha.., gamma.., beta..]``.
+        dist_params : ndarray, optional
+            Unused: the 1/2 weight already assumes symmetric innovations.
+
+        Returns
+        -------
+        float
+            Persistence value.
+        """
+        del dist_params
+        _, alphas, gammas, betas = self._gjr_blocks(var_params)
+        return float(np.sum(alphas) + 0.5 * np.sum(gammas) + np.sum(betas))
+
+    def unconditional_variance(
+        self,
+        var_params: NDArray[np.float64],
+        dist_params: NDArray[np.float64] | None = None,
+    ) -> float:
+        """Long-run variance ``omega / (1 - persistence)`` (inf if persistence >= 1)."""
+        pers = self.persistence(var_params, dist_params)
+        if not np.isfinite(pers) or pers >= 1.0:
+            return float("inf")
+        omega, _, _, _ = self._gjr_blocks(var_params)
+        return float(omega / (1.0 - pers))
+
+    def forecast_variance(
+        self,
+        var_params: NDArray[np.float64],
+        resids: NDArray[np.float64],
+        sigma2: NDArray[np.float64],
+        horizon: int = 1,
+        dist_params: NDArray[np.float64] | None = None,
+    ) -> NDArray[np.float64]:
+        """Analytic multi-step GJR-GARCH variance forecast.
+
+        The first step uses the observed shocks and their signs. Beyond the
+        first step the leverage indicator is replaced by its expectation
+        ``P(z < 0) = 1/2`` and ``E[eps^2] = sigma^2``.
+
+        Parameters
+        ----------
+        var_params : ndarray
+            Variance block ``[omega, alpha.., gamma.., beta..]``.
+        resids : ndarray
+            In-sample residuals.
+        sigma2 : ndarray
+            In-sample conditional variance path.
+        horizon : int
+            Number of steps ahead (>= 1).
+        dist_params : ndarray, optional
+            Unused (symmetric-innovation expectation is applied).
+
+        Returns
+        -------
+        ndarray
+            Forecast variances, shape ``(horizon,)``.
+        """
+        del dist_params
+        h_max = validate_positive_integer(horizon, "horizon")
+        omega, alphas, gammas, betas = self._gjr_blocks(var_params)
+
+        sigma2_arr = np.asarray(sigma2, dtype=np.float64).ravel()
+        resid_arr = np.asarray(resids, dtype=np.float64).ravel()
+        fill = float(sigma2_arr[-1]) if sigma2_arr.size else self._backcast(self.endog)
+
+        eps_tail = self._tail(resid_arr, self.q, 0.0)
+        eps2_hist = list(self._tail(resid_arr**2, self.q, fill))
+        neg_hist = list((eps_tail < 0.0).astype(np.float64))
+        s2_hist = list(self._tail(sigma2_arr, self.p, fill))
+
+        out = np.empty(h_max, dtype=np.float64)
+        for h in range(h_max):
+            value = omega
+            for i in range(self.q):
+                value += (alphas[i] + gammas[i] * neg_hist[-1 - i]) * eps2_hist[-1 - i]
+            for j in range(self.p):
+                value += betas[j] * s2_hist[-1 - j]
+            value = max(float(value), 1e-12)
+            out[h] = value
+            eps2_hist.append(value)
+            neg_hist.append(0.5)  # E[1{z<0}] for symmetric innovations
+            s2_hist.append(value)
+        return out

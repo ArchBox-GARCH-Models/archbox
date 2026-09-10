@@ -137,9 +137,9 @@ class MLEstimator:
         params_opt = model.full_transform_params(result.x)
         loglike_val = -result.fun
 
-        # _variance_recursion reads only the leading variance entries.
-        sigma2 = model._variance_recursion(params_opt[: model.num_params], model.endog, backcast)
-        sigma2 = np.maximum(sigma2, 1e-12)
+        # Use the model-level path so models with a non-standard mapping from
+        # returns to residuals (e.g. GARCH-M) report the sigma2 the likelihood used.
+        sigma2 = model.conditional_variance(params_opt, backcast)
 
         se_robust, se_nonrobust = self._compute_standard_errors(
             model,
@@ -226,8 +226,7 @@ class MLEstimator:
             params_opt = np.concatenate([[omega], free_var, dist.transform_params(unc_dist)])
         loglike_val = -result.fun
 
-        sigma2 = model._variance_recursion(params_opt[:nv], model.endog, backcast)
-        sigma2 = np.maximum(sigma2, 1e-12)
+        sigma2 = model.conditional_variance(params_opt, backcast)
 
         se_robust, se_nonrobust = self._compute_standard_errors(
             model,

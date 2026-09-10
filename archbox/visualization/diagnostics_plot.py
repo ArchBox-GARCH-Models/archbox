@@ -61,9 +61,11 @@ def plot_diagnostics(
     with plt.rc_context(rc_params):
         fig_size = figsize or theme.figure_size
 
-        # Extract standardized residuals
-        if hasattr(results, "std_resid") and results.std_resid is not None:
-            z: NDArray[np.float64] = np.asarray(results.std_resid, dtype=np.float64)
+        # Standardized residuals z_t = eps_t / sigma_t. `std_resid` is the
+        # canonical source; `resid` is RAW, so it must be divided by sigma_t.
+        std_resid_attr = getattr(results, "std_resid", None)
+        if std_resid_attr is not None:
+            z: NDArray[np.float64] = np.asarray(std_resid_attr, dtype=np.float64)
         else:
             resid = np.asarray(results.resid, dtype=np.float64)
             sigma = np.asarray(results.conditional_volatility, dtype=np.float64)

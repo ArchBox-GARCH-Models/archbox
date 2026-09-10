@@ -14,6 +14,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from archbox.core.volatility_model import VolatilityModel
+from archbox.utils.validation import validate_positive_integer
 
 
 class GARCHM(VolatilityModel):
@@ -50,8 +51,8 @@ class GARCHM(VolatilityModel):
         dist: str = "normal",
     ) -> None:
         """Initialize GARCH-M model with lag orders and risk premium type."""
-        self.p = p
-        self.q = q
+        self.p = validate_positive_integer(p, "p")
+        self.q = validate_positive_integer(q, "q")
         if risk_premium not in ("variance", "volatility", "log_variance"):
             msg = (
                 f"Unknown risk_premium: {risk_premium}. "
@@ -256,3 +257,103 @@ class GARCHM(VolatilityModel):
     def num_params(self) -> int:
         """Number of parameters: omega + q alphas + p betas + lambda."""
         return 1 + self.q + self.p + 1
+
+    # --- Model-level moments and forecasts ---
+
+    def _arch_garch_blocks(
+        self, var_params: NDArray[np.float64]
+    ) -> tuple[float, NDArray[np.float64], NDArray[np.float64]]:
+        """Split ``[omega, alpha.., beta.., lambda]`` into (omega, alphas, betas).
+
+        The in-mean coefficient ``lambda`` belongs to the mean equation, not to
+        the variance dynamics, so it is excluded here. As a consequence the
+        inherited ``persistence`` and ``unconditional_variance`` are the plain
+        GARCH ones.
+
+        Parameters
+        ----------
+        var_params : ndarray
+            Variance block ``[omega, alpha.., beta.., lambda]``.
+
+        Returns
+        -------
+        tuple
+            ``(omega, alphas, betas)``.
+        """
+        params = np.asarray(var_params, dtype=np.float64)
+        omega = float(params[0])
+        alphas = params[1 : 1 + self.q]
+        betas = params[1 + self.q : 1 + self.q + self.p]
+        return omega, alphas, betas
+
+    def conditional_variance(
+        self,
+        params: NDArray[np.float64],
+        backcast: float | None = None,
+    ) -> NDArray[np.float64]:
+        """Conditional variance path from the GARCH-M joint forward pass.
+
+        In GARCH-M ``eps_t = r_t - lambda f(sigma^2_t)`` while ``sigma^2_t``
+        depends on ``eps_{t-1}``, so the variance path used by the likelihood
+        comes from the joint recursion, not from ``_variance_recursion`` on the
+        raw returns.
+
+        Parameters
+        ----------
+        params : ndarray
+            Full or variance-only parameter vector.
+        backcast : float, optional
+            Initial variance. Computed from the data when omitted.
+
+        Returns
+        -------
+        ndarray
+            Conditional variance sigma^2_t, shape (T,).
+        """
+        if backcast is None:
+            backcast = self._backcast(self.endog)
+        var_params = np.asarray(params, dtype=np.float64)[: self.num_params]
+        sigma2, _ = self._garchm_joint_recursion(var_params, float(backcast))
+        return np.maximum(sigma2, 1e-12)
+
+    def forecast_variance(
+        self,
+        var_params: NDArray[np.float64],
+        resids: NDArray[np.float64],
+        sigma2: NDArray[np.float64],
+        horizon: int = 1,
+        dist_params: NDArray[np.float64] | None = None,
+    ) -> NDArray[np.float64]:
+        """Analytic GARCH-M variance forecast.
+
+        The variance dynamics are plain GARCH(p, q); the only difference is
+        that the shocks feeding the recursion are the *adjusted* residuals
+        ``eps_t = r_t - lambda f(sigma^2_t)`` rather than the raw returns.
+
+        Parameters
+        ----------
+        var_params : ndarray
+            Variance block ``[omega, alpha.., beta.., lambda]``.
+        resids : ndarray
+            In-sample residuals (raw returns); replaced internally by the
+            adjusted GARCH-M residuals.
+        sigma2 : ndarray
+            In-sample conditional variance path.
+        horizon : int
+            Number of steps ahead (>= 1).
+        dist_params : ndarray, optional
+            Unused.
+
+        Returns
+        -------
+        ndarray
+            Forecast variances, shape ``(horizon,)``.
+        """
+        del resids
+        params = np.asarray(var_params, dtype=np.float64)
+        backcast = self._backcast(self.endog)
+        joint_sigma2, adj_resids = self._garchm_joint_recursion(params, backcast)
+        sigma2_arr = np.asarray(sigma2, dtype=np.float64).ravel()
+        if sigma2_arr.size != joint_sigma2.size:
+            sigma2_arr = joint_sigma2
+        return super().forecast_variance(params, adj_resids, sigma2_arr, horizon, dist_params)

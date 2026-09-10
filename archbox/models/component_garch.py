@@ -16,6 +16,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from archbox.core.volatility_model import VolatilityModel
+from archbox.utils.validation import validate_positive_integer
 
 
 class ComponentGARCH(VolatilityModel):
@@ -205,3 +206,129 @@ class ComponentGARCH(VolatilityModel):
     def num_params(self) -> int:
         """Number of parameters: omega, alpha, beta, alpha_p, beta_p."""
         return 5
+
+    # --- Model-level moments and forecasts ---
+
+    def persistence(
+        self,
+        var_params: NDArray[np.float64],
+        dist_params: NDArray[np.float64] | None = None,
+    ) -> float:
+        """Dominant persistence of the two-component variance process.
+
+        The permanent component decays at rate ``beta_p`` and the transitory
+        component at rate ``alpha + beta``; the slowest of the two governs how
+        long a shock is felt, so it is the one reported (and the one that drives
+        the half-life).
+
+        Parameters
+        ----------
+        var_params : ndarray
+            Variance block ``[omega, alpha, beta, alpha_p, beta_p]``.
+        dist_params : ndarray, optional
+            Unused.
+
+        Returns
+        -------
+        float
+            ``max(beta_p, alpha + beta)``.
+        """
+        del dist_params
+        params = np.asarray(var_params, dtype=np.float64)
+        transitory = float(params[1]) + float(params[2])
+        permanent = float(params[4])
+        return float(max(permanent, transitory))
+
+    def unconditional_variance(
+        self,
+        var_params: NDArray[np.float64],
+        dist_params: NDArray[np.float64] | None = None,
+    ) -> float:
+        """Long-run variance of the Component GARCH model.
+
+        The transitory component has zero mean and the permanent component
+        mean-reverts to ``omega``, so ``E[sigma^2_t] = omega``.
+
+        Parameters
+        ----------
+        var_params : ndarray
+            Variance block ``[omega, alpha, beta, alpha_p, beta_p]``.
+        dist_params : ndarray, optional
+            Unused.
+
+        Returns
+        -------
+        float
+            ``omega``, or ``inf`` when either component is non-stationary.
+        """
+        pers = self.persistence(var_params, dist_params)
+        if not np.isfinite(pers) or pers >= 1.0:
+            return float("inf")
+        omega = float(np.asarray(var_params, dtype=np.float64)[0])
+        return float(max(omega, 1e-12))
+
+    def forecast_variance(
+        self,
+        var_params: NDArray[np.float64],
+        resids: NDArray[np.float64],
+        sigma2: NDArray[np.float64],
+        horizon: int = 1,
+        dist_params: NDArray[np.float64] | None = None,
+    ) -> NDArray[np.float64]:
+        """Analytic Component GARCH forecast on the permanent/transitory split.
+
+        The first step uses the observed shock. For ``h > 1`` the substitution
+        ``E[eps^2_{T+k}] = sigma^2_{T+k}`` makes the two components decouple:
+        ``q_{T+h} = omega + beta_p (q_{T+h-1} - omega)`` and
+        ``h_{T+h} = (alpha + beta) h_{T+h-1}``.
+
+        Parameters
+        ----------
+        var_params : ndarray
+            Variance block ``[omega, alpha, beta, alpha_p, beta_p]``.
+        resids : ndarray
+            In-sample residuals.
+        sigma2 : ndarray
+            In-sample conditional variance path.
+        horizon : int
+            Number of steps ahead (>= 1).
+        dist_params : ndarray, optional
+            Unused.
+
+        Returns
+        -------
+        ndarray
+            Forecast variances, shape ``(horizon,)``.
+        """
+        del dist_params
+        h_max = validate_positive_integer(horizon, "horizon")
+        params = np.asarray(var_params, dtype=np.float64)
+        omega = float(params[0])
+        alpha = float(params[1])
+        beta = float(params[2])
+        alpha_p = float(params[3])
+        beta_p = float(params[4])
+
+        resid_arr = np.asarray(resids, dtype=np.float64).ravel()
+        backcast = self._backcast(resid_arr) if resid_arr.size else self._backcast(self.endog)
+        path_sigma2, path_q, path_h = self.variance_decomposition(params, resid_arr, backcast)
+
+        sigma2_arr = np.asarray(sigma2, dtype=np.float64).ravel()
+        last_sigma2 = float(sigma2_arr[-1]) if sigma2_arr.size else float(path_sigma2[-1])
+        q_prev = float(path_q[-1])
+        h_prev = float(path_h[-1])
+        eps2 = float(resid_arr[-1] ** 2) if resid_arr.size else last_sigma2
+
+        out = np.empty(h_max, dtype=np.float64)
+        for step in range(h_max):
+            if step == 0:
+                q_next = omega + beta_p * (q_prev - omega) + alpha_p * (eps2 - last_sigma2)
+                h_next = alpha * (eps2 - q_prev) + beta * h_prev
+            else:
+                q_next = omega + beta_p * (q_prev - omega)
+                h_next = (alpha + beta) * h_prev
+            q_next = max(q_next, 1e-12)
+            value = max(q_next + h_next, 1e-12)
+            out[step] = value
+            q_prev, h_prev = q_next, h_next
+        return out

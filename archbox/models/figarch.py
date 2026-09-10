@@ -13,6 +13,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from archbox.core.volatility_model import VolatilityModel
+from archbox.utils.validation import validate_positive_integer
 
 
 def _fractional_coefficients(d: float, n_lags: int) -> NDArray[np.float64]:
@@ -67,7 +68,7 @@ class FIGARCH(VolatilityModel):
         dist: str = "normal",
     ) -> None:
         """Initialize FIGARCH model with truncation lag and options."""
-        self.truncation_lag = truncation_lag
+        self.truncation_lag = validate_positive_integer(truncation_lag, "truncation_lag")
         super().__init__(endog, mean=mean, dist=dist)
 
     def _compute_lambda_coefficients(
@@ -217,3 +218,114 @@ class FIGARCH(VolatilityModel):
     def num_params(self) -> int:
         """Number of parameters: omega, phi, d, beta."""
         return 4
+
+    # --- Model-level moments and forecasts ---
+
+    def persistence(
+        self,
+        var_params: NDArray[np.float64],
+        dist_params: NDArray[np.float64] | None = None,
+    ) -> float:
+        """FIGARCH persistence is 1: the ARCH(inf) weights sum to one.
+
+        For ``0 < d < 1`` the lambda weights of the ARCH(infinity)
+        representation sum to exactly one, so shocks to the variance decay
+        hyperbolically but never die out. The speed of that hyperbolic decay is
+        governed by ``d``, not by a geometric persistence coefficient.
+
+        Parameters
+        ----------
+        var_params : ndarray
+            Variance block ``[omega, phi, d, beta]`` (unused).
+        dist_params : ndarray, optional
+            Unused.
+
+        Returns
+        -------
+        float
+            Always ``1.0``.
+        """
+        del var_params, dist_params
+        return 1.0
+
+    def unconditional_variance(
+        self,
+        var_params: NDArray[np.float64],
+        dist_params: NDArray[np.float64] | None = None,
+    ) -> float:
+        """FIGARCH is not covariance stationary, so the long-run variance is infinite.
+
+        Parameters
+        ----------
+        var_params : ndarray
+            Variance block (unused).
+        dist_params : ndarray, optional
+            Unused.
+
+        Returns
+        -------
+        float
+            Always ``inf``.
+        """
+        del var_params, dist_params
+        return float("inf")
+
+    def forecast_variance(
+        self,
+        var_params: NDArray[np.float64],
+        resids: NDArray[np.float64],
+        sigma2: NDArray[np.float64],
+        horizon: int = 1,
+        dist_params: NDArray[np.float64] | None = None,
+    ) -> NDArray[np.float64]:
+        """Analytic FIGARCH forecast via the truncated ARCH(infinity) weights.
+
+        ``sigma^2_{T+h} = omega/(1-beta) + sum_{k=1}^{K} lambda_k E[eps^2_{T+h-k}]``
+        with ``E[eps^2_s] = eps^2_s`` for observed dates and
+        ``E[eps^2_s] = sigma^2_s`` for forecast dates.
+
+        Parameters
+        ----------
+        var_params : ndarray
+            Variance block ``[omega, phi, d, beta]``.
+        resids : ndarray
+            In-sample residuals.
+        sigma2 : ndarray
+            In-sample conditional variance path.
+        horizon : int
+            Number of steps ahead (>= 1).
+        dist_params : ndarray, optional
+            Unused.
+
+        Returns
+        -------
+        ndarray
+            Forecast variances, shape ``(horizon,)``.
+        """
+        del dist_params
+        h_max = validate_positive_integer(horizon, "horizon")
+        params = np.asarray(var_params, dtype=np.float64)
+        omega = float(params[0])
+        phi = float(params[1])
+        d = float(params[2])
+        beta = float(params[3])
+
+        resid_arr = np.asarray(resids, dtype=np.float64).ravel()
+        sigma2_arr = np.maximum(np.asarray(sigma2, dtype=np.float64).ravel(), 1e-12)
+        n_lags = max(min(self.truncation_lag, len(resid_arr)), 1)
+        lam = self._compute_lambda_coefficients(phi, d, beta, n_lags)
+
+        omega_star = omega / (1.0 - beta) if abs(1.0 - beta) > 1e-10 else omega
+        fill = float(sigma2_arr[-1]) if sigma2_arr.size else self._backcast(self.endog)
+
+        # History of E[eps^2], oldest first; forecasts are appended as they are made.
+        eps2_hist = list(self._tail(resid_arr**2, n_lags, fill))
+
+        out = np.empty(h_max, dtype=np.float64)
+        for h in range(h_max):
+            recent = np.asarray(eps2_hist[-n_lags:], dtype=np.float64)[::-1]
+            value = omega_star + float(np.dot(lam, recent))
+            value = max(value, 1e-12)
+            out[h] = value
+            eps2_hist.append(value)
+        return out

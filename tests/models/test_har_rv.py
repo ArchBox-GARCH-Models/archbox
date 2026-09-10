@@ -67,6 +67,47 @@ class TestHARRV:
         forecast = results.forecast(horizon=5)
         assert len(forecast) == 5
         assert np.all(np.isfinite(forecast))
+        assert np.all(forecast >= 0)
+
+    def test_har_rv_forecast_is_not_constant(self, simulated_rv: np.ndarray) -> None:
+        """The forecast iterates the HAR regression instead of repeating a value."""
+        model = HARRV(simulated_rv)
+        results = model.fit(method="ols")
+        forecast = results.forecast(horizon=10)
+        assert len(np.unique(forecast)) > 1, "forecast must not be a constant series"
+
+    def test_har_rv_forecast_first_step_matches_regression(self, simulated_rv: np.ndarray) -> None:
+        """Step 1 equals beta_0 + sum_c beta_c * mean(last lag_c observations)."""
+        model = HARRV(simulated_rv)
+        results = model.fit(method="ols")
+        regressors = [1.0]
+        for comp in model.components:
+            lag = model._component_lags[comp]
+            regressors.append(float(np.mean(simulated_rv[-lag:])))
+        expected = float(np.dot(results.params, regressors))
+        assert results.forecast(horizon=1)[0] == pytest.approx(expected, rel=1e-12)
+
+    def test_har_rv_forecast_rejects_bad_horizon(self, simulated_rv: np.ndarray) -> None:
+        model = HARRV(simulated_rv)
+        results = model.fit(method="ols")
+        with pytest.raises(ValueError, match="horizon"):
+            results.forecast(horizon=0)
+
+    def test_har_rv_rejects_nan(self) -> None:
+        rv = np.full(100, 1e-4)
+        rv[5] = np.nan
+        with pytest.raises(ValueError, match="NaN"):
+            HARRV(rv)
+
+    def test_har_rv_rejects_negative(self) -> None:
+        rv = np.full(100, 1e-4)
+        rv[5] = -1e-4
+        with pytest.raises(ValueError, match="non-negative"):
+            HARRV(rv)
+
+    def test_har_rv_rejects_unknown_component(self, simulated_rv: np.ndarray) -> None:
+        with pytest.raises(ValueError, match="Unknown HAR components"):
+            HARRV(simulated_rv, components=["daily", "yearly"])
 
     def test_har_rv_custom_components(self, simulated_rv: np.ndarray) -> None:
         """Test with daily+weekly only."""

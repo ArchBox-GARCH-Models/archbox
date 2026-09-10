@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 from numpy.typing import NDArray
 
-from archbox.utils.validation import validate_returns
+from archbox.utils.validation import validate_positive_integer, validate_returns
 
 if TYPE_CHECKING:
     from archbox.distributions.base import Distribution
@@ -201,6 +201,234 @@ class VolatilityModel(ABC):
                 self.dist.untransform_params(constrained[nv:]),
             ]
         )
+
+    # --- Model-level moments and forecasts ---
+    #
+    # These four methods form the public model-level API that ``ArchResults``
+    # delegates to.  ``var_params`` is always the *leading* block of the fitted
+    # parameter vector (length ``self.num_params``); distribution shape
+    # parameters are passed separately as ``dist_params``.
+    #
+    # The defaults below implement the plain GARCH(p, q) layout
+    # ``[omega, alpha_1..alpha_q, beta_1..beta_p]``.  Models with a different
+    # layout or different dynamics override the relevant pieces.
+
+    def _arch_garch_blocks(
+        self, var_params: NDArray[np.float64]
+    ) -> tuple[float, NDArray[np.float64], NDArray[np.float64]]:
+        """Split a GARCH-layout parameter vector into (omega, alphas, betas).
+
+        Parameters
+        ----------
+        var_params : ndarray
+            Leading (variance) block of the parameter vector.
+
+        Returns
+        -------
+        tuple
+            ``(omega, alphas, betas)``.
+        """
+        nv = self.num_params
+        q = int(getattr(self, "q", 1))
+        omega = float(var_params[0])
+        alphas = np.asarray(var_params[1 : 1 + q], dtype=np.float64)
+        betas = np.asarray(var_params[1 + q : nv], dtype=np.float64)
+        return omega, alphas, betas
+
+    def persistence(
+        self,
+        var_params: NDArray[np.float64],
+        dist_params: NDArray[np.float64] | None = None,
+    ) -> float:
+        """Variance persistence implied by ``var_params``.
+
+        The default is the GARCH measure ``sum(alpha) + sum(beta)``.
+
+        Parameters
+        ----------
+        var_params : ndarray
+            Leading (variance) block of the parameter vector.
+        dist_params : ndarray, optional
+            Fitted distribution shape parameters. Only used by models whose
+            persistence depends on the innovation law (e.g. APARCH).
+
+        Returns
+        -------
+        float
+            Persistence. Values >= 1 indicate a non-stationary variance process.
+        """
+        del dist_params
+        params = np.asarray(var_params, dtype=np.float64)
+        _, alphas, betas = self._arch_garch_blocks(params)
+        return float(np.sum(alphas) + np.sum(betas))
+
+    def unconditional_variance(
+        self,
+        var_params: NDArray[np.float64],
+        dist_params: NDArray[np.float64] | None = None,
+    ) -> float:
+        """Long-run (unconditional) variance implied by ``var_params``.
+
+        Parameters
+        ----------
+        var_params : ndarray
+            Leading (variance) block of the parameter vector.
+        dist_params : ndarray, optional
+            Fitted distribution shape parameters (see ``persistence``).
+
+        Returns
+        -------
+        float
+            ``omega / (1 - persistence)``, or ``inf`` when persistence >= 1.
+        """
+        params = np.asarray(var_params, dtype=np.float64)
+        pers = self.persistence(params, dist_params)
+        if not np.isfinite(pers) or pers >= 1.0:
+            return float("inf")
+        omega, _, _ = self._arch_garch_blocks(params)
+        return float(omega / (1.0 - pers))
+
+    def conditional_variance(
+        self,
+        params: NDArray[np.float64],
+        backcast: float | None = None,
+    ) -> NDArray[np.float64]:
+        """Conditional variance path consistent with the log-likelihood.
+
+        Parameters
+        ----------
+        params : ndarray
+            Full or variance-only parameter vector; only the leading
+            ``num_params`` entries are used.
+        backcast : float, optional
+            Initial variance. Computed from the data when omitted.
+
+        Returns
+        -------
+        ndarray
+            Conditional variance sigma^2_t, shape (T,).
+        """
+        if backcast is None:
+            backcast = self._backcast(self.endog)
+        var_params = np.asarray(params, dtype=np.float64)[: self.num_params]
+        sigma2 = self._variance_recursion(var_params, self.endog, float(backcast))
+        return np.maximum(np.asarray(sigma2, dtype=np.float64), 1e-12)
+
+    def forecast_variance(
+        self,
+        var_params: NDArray[np.float64],
+        resids: NDArray[np.float64],
+        sigma2: NDArray[np.float64],
+        horizon: int = 1,
+        dist_params: NDArray[np.float64] | None = None,
+    ) -> NDArray[np.float64]:
+        """Multi-step conditional variance forecast.
+
+        The default implements the exact GARCH(p, q) recursion, replacing
+        unobserved future squared shocks by their conditional expectation
+        ``E[eps^2_{T+k}] = sigma^2_{T+k}``.
+
+        Parameters
+        ----------
+        var_params : ndarray
+            Leading (variance) block of the parameter vector.
+        resids : ndarray
+            In-sample residuals used to seed the recursion.
+        sigma2 : ndarray
+            In-sample conditional variance path.
+        horizon : int
+            Number of steps ahead (>= 1).
+        dist_params : ndarray, optional
+            Fitted distribution shape parameters (unused by the GARCH default).
+
+        Returns
+        -------
+        ndarray
+            Forecast variances, shape ``(horizon,)``, strictly positive.
+        """
+        h_max = validate_positive_integer(horizon, "horizon")
+        params = np.asarray(var_params, dtype=np.float64)
+        omega, alphas, betas = self._arch_garch_blocks(params)
+        q = len(alphas)
+        p = len(betas)
+
+        sigma2_arr = np.asarray(sigma2, dtype=np.float64).ravel()
+        resid_arr = np.asarray(resids, dtype=np.float64).ravel()
+        fill = float(sigma2_arr[-1]) if sigma2_arr.size else self._backcast(self.endog)
+
+        eps2_hist = list(self._tail(resid_arr**2, q, fill))
+        s2_hist = list(self._tail(sigma2_arr, p, fill))
+
+        out = np.empty(h_max, dtype=np.float64)
+        for h in range(h_max):
+            value = omega
+            for i in range(q):
+                value += alphas[i] * eps2_hist[-1 - i]
+            for j in range(p):
+                value += betas[j] * s2_hist[-1 - j]
+            value = max(float(value), 1e-12)
+            out[h] = value
+            # E[eps^2_{T+h}] = sigma^2_{T+h} for the next iteration.
+            eps2_hist.append(value)
+            s2_hist.append(value)
+        return out
+
+    # --- Forecast helpers shared by subclasses ---
+
+    @staticmethod
+    def _tail(values: NDArray[np.float64], n: int, fill: float) -> NDArray[np.float64]:
+        """Last ``n`` entries of ``values``, left-padded with ``fill``.
+
+        Parameters
+        ----------
+        values : ndarray
+            Source series.
+        n : int
+            Number of trailing entries required.
+        fill : float
+            Padding value used when ``values`` is shorter than ``n``.
+
+        Returns
+        -------
+        ndarray
+            Array of length ``max(n, 0)``, oldest entry first.
+        """
+        arr = np.asarray(values, dtype=np.float64).ravel()
+        if n <= 0:
+            return np.empty(0, dtype=np.float64)
+        if len(arr) >= n:
+            return np.array(arr[-n:], dtype=np.float64)
+        pad = np.full(n - len(arr), float(fill), dtype=np.float64)
+        return np.concatenate([pad, arr])
+
+    def _simulate_innovations(
+        self,
+        n: int,
+        rng: np.random.Generator,
+        dist_params: NDArray[np.float64] | None = None,
+    ) -> NDArray[np.float64]:
+        """Draw ``n`` standardized innovations from the fitted distribution.
+
+        Parameters
+        ----------
+        n : int
+            Number of draws.
+        rng : numpy.random.Generator
+            Random generator (seeded by the caller for reproducibility).
+        dist_params : ndarray, optional
+            Fitted shape parameters; ``None`` uses the distribution defaults.
+
+        Returns
+        -------
+        ndarray
+            Draws z_t with mean 0 and variance 1, shape (n,).
+        """
+        shape: NDArray[np.float64] | None = None
+        if dist_params is not None:
+            arr = np.asarray(dist_params, dtype=np.float64).ravel()
+            if arr.size:
+                shape = arr
+        return np.asarray(self.dist.simulate(n, rng, shape), dtype=np.float64)
 
     # --- Concrete methods ---
 

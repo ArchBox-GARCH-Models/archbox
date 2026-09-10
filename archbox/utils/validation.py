@@ -40,25 +40,38 @@ def validate_returns(y: object) -> NDArray[np.float64]:
     return arr
 
 
-def validate_positive_integer(val: int, name: str) -> int:
-    """Validate that val is a positive integer.
+def validate_positive_integer(val: object, name: str) -> int:
+    """Validate that ``val`` is a positive integer.
+
+    Accepts Python ``int`` and NumPy integer scalars (``np.integer``).
+    Booleans are rejected explicitly: ``bool`` is a subclass of ``int``
+    in Python, but ``True``/``False`` are never valid lag orders.
 
     Parameters
     ----------
-    val : int
+    val : object
         Value to validate.
     name : str
-        Parameter name for error message.
+        Parameter name used in the error message.
 
     Returns
     -------
     int
-        Validated value.
+        Validated value as a Python ``int``.
+
+    Raises
+    ------
+    ValueError
+        If ``val`` is not an integer type, is a boolean, or is < 1.
     """
-    if not isinstance(val, int) or val < 1:
-        msg = f"{name} must be a positive integer, got {val}"
+    if isinstance(val, bool | np.bool_) or not isinstance(val, int | np.integer):
+        msg = f"{name} must be a positive integer, got {val!r} of type {type(val).__name__}"
         raise ValueError(msg)
-    return val
+    ival = int(val)
+    if ival < 1:
+        msg = f"{name} must be a positive integer, got {ival}"
+        raise ValueError(msg)
+    return ival
 
 
 def check_stationarity(params: NDArray[np.float64], p: int, q: int) -> bool:
@@ -82,3 +95,45 @@ def check_stationarity(params: NDArray[np.float64], p: int, q: int) -> bool:
     betas = params[1 + q : 1 + q + p]
     persistence = np.sum(alphas) + np.sum(betas)
     return bool(persistence < 1.0)
+
+
+def validate_realized_variance(rv: object, name: str = "realized_variance") -> NDArray[np.float64]:
+    """Validate and convert a realized-variance series to a numpy array.
+
+    Realized variance is a non-negative quantity by construction, so NaN,
+    Inf and negative entries indicate a corrupted input series.
+
+    Parameters
+    ----------
+    rv : array-like
+        Realized variance series.
+    name : str
+        Parameter name used in error messages.
+
+    Returns
+    -------
+    NDArray[np.float64]
+        Validated 1D array.
+
+    Raises
+    ------
+    ValueError
+        If the series is not 1D, too short, or contains NaN/Inf/negative values.
+    """
+    arr = np.asarray(rv, dtype=np.float64)
+    if arr.ndim != 1:
+        msg = f"{name} must be 1D, got {arr.ndim}D"
+        raise ValueError(msg)
+    if len(arr) < 10:
+        msg = f"{name} must have at least 10 observations, got {len(arr)}"
+        raise ValueError(msg)
+    if np.any(np.isnan(arr)):
+        msg = f"{name} contains NaN values"
+        raise ValueError(msg)
+    if np.any(np.isinf(arr)):
+        msg = f"{name} contains Inf values"
+        raise ValueError(msg)
+    if np.any(arr < 0.0):
+        msg = f"{name} must be non-negative, got a minimum of {float(np.min(arr))}"
+        raise ValueError(msg)
+    return arr

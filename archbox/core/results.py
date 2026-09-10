@@ -70,10 +70,14 @@ class ArchResults:
         self.tvalues = params / self.se
         self.pvalues = 2.0 * (1.0 - stats.norm.cdf(np.abs(self.tvalues)))
 
-        # Conditional volatility and residuals
+        # Conditional volatility and residuals.
+        # `resid` holds RAW residuals (model.endog, i.e. demeaned returns) and
+        # `std_resid` the standardized residuals z_t = eps_t / sigma_t.
         self.conditional_volatility = np.sqrt(sigma2)
         self._sigma2 = sigma2
-        self.resid = model.endog / self.conditional_volatility  # standardized residuals
+        self.mu = float(model.mu)
+        self.resid = np.asarray(model.endog, dtype=np.float64).copy()
+        self.std_resid = self.resid / np.maximum(self.conditional_volatility, 1e-12)
 
         # Information criteria
         k = len(params)
@@ -82,16 +86,29 @@ class ArchResults:
         self.bic = -2.0 * loglike + k * np.log(n)
         self.hqic = -2.0 * loglike + 2.0 * k * np.log(np.log(n))
 
+    @property
+    def _var_params(self) -> NDArray[np.float64]:
+        """Leading (variance) block of the fitted parameter vector."""
+        return np.asarray(self.params[: self._n_var], dtype=np.float64)
+
+    @property
+    def _shape_params(self) -> NDArray[np.float64] | None:
+        """Fitted distribution shape parameters, or None when there are none."""
+        return self._dist_params if len(self._dist_params) else None
+
     def persistence(self) -> float:
-        """Compute persistence: sum(alpha_i) + sum(beta_j).
+        """Variance persistence of the fitted model.
+
+        Delegates to ``model.persistence``; the formula is model specific
+        (GARCH: sum(alpha)+sum(beta); GJR: sum(alpha)+sum(gamma)/2+sum(beta);
+        EGARCH: sum(beta); APARCH: sum_i alpha_i E[(|z|-gamma_i z)^delta]+sum(beta)).
 
         Returns
         -------
         float
-            Persistence value. Must be < 1 for stationarity.
+            Persistence value. Must be < 1 for a stationary variance process.
         """
-        # params = [omega, alpha_1, ..., alpha_q, beta_1, ..., beta_p, dist...]
-        return float(np.sum(self.params[1 : self._n_var]))
+        return float(self._model.persistence(self._var_params, self._shape_params))
 
     def half_life(self) -> float:
         """Compute half-life of volatility shocks.
@@ -99,25 +116,26 @@ class ArchResults:
         Returns
         -------
         float
-            Number of periods for a shock to decay by half.
+            Number of periods for a shock to decay by half; ``inf`` when the
+            process is not mean reverting (persistence outside (0, 1)).
         """
         p = self.persistence()
-        if p <= 0 or p >= 1:
+        if not np.isfinite(p) or p <= 0 or p >= 1:
             return float("inf")
         return float(np.log(0.5) / np.log(p))
 
     def unconditional_variance(self) -> float:
         """Compute unconditional (long-run) variance.
 
+        Delegates to ``model.unconditional_variance``; returns ``inf`` when
+        persistence >= 1 (e.g. IGARCH, FIGARCH).
+
         Returns
         -------
         float
-            omega / (1 - persistence).
+            Long-run variance implied by the fitted parameters.
         """
-        p = self.persistence()
-        if p >= 1:
-            return float("inf")
-        return float(self.params[0] / (1.0 - p))
+        return float(self._model.unconditional_variance(self._var_params, self._shape_params))
 
     def forecast(
         self,
@@ -126,15 +144,19 @@ class ArchResults:
     ) -> dict[str, NDArray[np.float64]]:
         """Forecast conditional variance h steps ahead.
 
-        For GARCH(1,1):
-            E[sigma^2_{T+h}] = sigma^2_inf + (alpha+beta)^{h-1} * (sigma^2_{T+1} - sigma^2_inf)
+        The recursion is model specific and lives on the model
+        (``VolatilityModel.forecast_variance``); this method only forwards the
+        fitted parameters, the residuals, the in-sample variance path and the
+        fitted distribution shape parameters.
 
         Parameters
         ----------
         horizon : int
-            Number of steps ahead.
+            Number of steps ahead (>= 1).
         method : str
-            Forecast method: 'analytic'.
+            Kept for backwards compatibility. Each model documents whether its
+            forecast is analytic or simulation based (EGARCH and APARCH use a
+            fixed-seed Monte-Carlo scheme); the value is not used.
 
         Returns
         -------
@@ -143,27 +165,17 @@ class ArchResults:
             - 'variance': Forecasted variance, shape (horizon,)
             - 'volatility': Forecasted volatility (sqrt), shape (horizon,)
         """
-        omega = self.params[0]
-        persistence = self.persistence()
-        sigma2_inf = self.unconditional_variance()
-
-        # One-step-ahead: use last observation
-        last_resid2 = self._model.endog[-1] ** 2
-        last_sigma2 = self._sigma2[-1]
-
-        q = getattr(self._model, "q", 1)
-        alphas = self.params[1 : 1 + q]
-        betas = self.params[1 + q : self._n_var]
-
-        sigma2_next = omega + np.sum(alphas) * last_resid2 + np.sum(betas) * last_sigma2
-
-        variance = np.empty(horizon)
-        for h in range(horizon):
-            if persistence >= 1.0:
-                variance[h] = sigma2_next
-            else:
-                variance[h] = sigma2_inf + persistence**h * (sigma2_next - sigma2_inf)
-
+        del method  # forecast method is chosen by the model
+        variance = np.asarray(
+            self._model.forecast_variance(
+                self._var_params,
+                self.resid,
+                self._sigma2,
+                horizon,
+                self._shape_params,
+            ),
+            dtype=np.float64,
+        )
         return {
             "variance": variance,
             "volatility": np.sqrt(variance),
@@ -227,7 +239,7 @@ class ArchResults:
         sigma_next = self._sigma_next()
         dist = self._fitted_dist()
         quantile = float(dist.ppf(alpha))
-        return float(-(self._model.mu + sigma_next * quantile))
+        return float(-(self.mu + sigma_next * quantile))
 
     def es(self, alpha: float = 0.05) -> float:
         """Parametric Expected Shortfall (positive loss).
@@ -254,7 +266,7 @@ class ArchResults:
             us = np.linspace(1e-4, alpha, 200)
             tail_mean_z = float(np.mean([dist.ppf(float(u)) for u in us]))
 
-        return float(-(self._model.mu + sigma_next * tail_mean_z))
+        return float(-(self.mu + sigma_next * tail_mean_z))
 
     def summary(self) -> str:
         """Generate formatted summary table.
@@ -333,12 +345,12 @@ class ArchResults:
             fig, axes = plt.subplots(2, 1, figsize=(12, 8))
             ax1, ax2 = axes
 
-            ax1.plot(self.resid, color="steelblue", alpha=0.7, linewidth=0.5)
+            ax1.plot(self.std_resid, color="steelblue", alpha=0.7, linewidth=0.5)
             ax1.axhline(y=0, color="black", linewidth=0.5)
             ax1.set_title("Standardized Residuals")
             ax1.set_ylabel("z_t")
 
-            ax2.hist(self.resid, bins=50, density=True, alpha=0.7, color="steelblue")
+            ax2.hist(self.std_resid, bins=50, density=True, alpha=0.7, color="steelblue")
             x = np.linspace(-4, 4, 200)
             ax2.plot(x, stats.norm.pdf(x), "r-", linewidth=2, label="N(0,1)")
             ax2.set_title("Histogram of Standardized Residuals")
