@@ -54,10 +54,16 @@ def run_risk(args: argparse.Namespace) -> None:
         es_series = es_calculator.parametric()
     elif args.var_method == "historical":
         es_series = es_calculator.historical()
-    elif args.var_method in ("filtered-hs", "monte-carlo"):
+    elif args.var_method == "filtered-hs":
         es_series = es_calculator.filtered_historical()
+    elif args.var_method == "monte-carlo":
+        # Must match the VaR method: monte_carlo() returns one value per
+        # forecast step, so pairing it with a full in-sample ES series would
+        # report ES and VaR for different dates.
+        es_series = es_calculator.monte_carlo()
     else:
-        es_series = es_calculator.parametric()
+        msg = f"Unknown ES method: {args.var_method}"
+        raise ValueError(msg)
 
     # Output
     output = {

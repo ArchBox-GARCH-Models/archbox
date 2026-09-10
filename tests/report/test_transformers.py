@@ -225,3 +225,40 @@ class TestMultivariateTransformer:
         assert isinstance(ctx, dict)
         assert ctx["model_name"] == "DCC-GARCH"
         assert ctx["n_series"] == 3
+
+    def test_correlation_params_from_params_vector(self):
+        """DCC parameters are read from params/param_names on real results.
+
+        ``MultivarResults`` has no ``dcc_a``/``dcc_b`` attributes; the
+        correlation-stage estimates live in ``params`` under
+        ``param_names == ['a', 'b']``.
+        """
+
+        class _Results:
+            model_name = "DCC-GARCH"
+            n_series = 2
+            series_names = ["A", "B"]
+            nobs = 400
+            loglikelihood = 2565.5
+            aic = -5115.1
+            bic = -5083.1
+            param_names = ["a", "b"]
+            params = np.array([0.04, 0.94])
+
+        ctx = MultivariateTransformer().transform(_Results())
+        params = ctx["correlation_params"]
+        assert params["a"] == pytest.approx(0.04)
+        assert params["b"] == pytest.approx(0.94)
+        assert params["dcc_a"] == pytest.approx(0.04)
+        assert params["dcc_b"] == pytest.approx(0.94)
+        assert params["dcc_persistence"] == pytest.approx(0.98)
+
+    def test_explicit_dcc_attributes_take_precedence(self):
+        """A results object exposing dcc_a/dcc_b keeps that path working."""
+        results = MagicMock()
+        results.dcc_a = 0.05
+        results.dcc_b = 0.93
+        results.dcc_persistence = 0.98
+
+        params = MultivariateTransformer._extract_correlation_params(results)
+        assert params == {"dcc_a": 0.05, "dcc_b": 0.93, "dcc_persistence": 0.98}

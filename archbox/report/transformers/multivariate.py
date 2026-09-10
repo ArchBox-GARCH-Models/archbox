@@ -96,7 +96,14 @@ class MultivariateTransformer:
 
     @staticmethod
     def _extract_correlation_params(results: Any) -> dict[str, Any]:
-        """Extract DCC/BEKK correlation model parameters."""
+        """Extract DCC/BEKK correlation model parameters.
+
+        ``MultivarResults`` keeps the correlation-stage parameters in
+        ``results.params``, named by ``results.param_names`` (``['a', 'b']``
+        for DCC/DECO), so that is the primary source. Explicit ``dcc_a`` /
+        ``dcc_b`` / ``dcc_persistence`` attributes are still honoured when a
+        results object provides them.
+        """
         params: dict[str, Any] = {}
         if hasattr(results, "dcc_a"):
             params["dcc_a"] = float(results.dcc_a)
@@ -104,4 +111,20 @@ class MultivariateTransformer:
             params["dcc_b"] = float(results.dcc_b)
         if hasattr(results, "dcc_persistence"):
             params["dcc_persistence"] = float(results.dcc_persistence)
+        if params:
+            return params
+
+        names = getattr(results, "param_names", None)
+        values = getattr(results, "params", None)
+        if names is None or values is None:
+            return params
+        values = np.asarray(values, dtype=np.float64).ravel()
+        if len(names) != len(values):
+            return params
+        for name, value in zip(names, values, strict=True):
+            params[str(name)] = float(value)
+        if {"a", "b"} <= set(params):
+            params["dcc_a"] = params["a"]
+            params["dcc_b"] = params["b"]
+            params["dcc_persistence"] = params["a"] + params["b"]
         return params
