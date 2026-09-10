@@ -137,9 +137,9 @@ class TestNyblomCriticalValues:
             draws = cvm[: (n_rep // k) * k].reshape(-1, k).sum(axis=1)
             simulated = np.quantile(draws, [0.90, 0.95])
             tabulated = _CRITICAL_VALUES[k][:2]
-            assert simulated == pytest.approx(
-                tabulated, rel=0.05
-            ), f"k={k}: simulated {simulated} vs table {tabulated}"
+            assert simulated == pytest.approx(tabulated, rel=0.05), (
+                f"k={k}: simulated {simulated} vs table {tabulated}"
+            )
 
 
 class TestNyblomIndividual:

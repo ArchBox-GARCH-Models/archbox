@@ -129,12 +129,12 @@ class TestVsMSwM:
 
         # The likelihood is the same object in both packages, so archbox
         # must not be worse than MSwM (its M-step is the exact maximiser).
-        assert (
-            results.loglike >= r_ll - 0.05
-        ), f"archbox loglike {results.loglike:.4f} below MSwM {r_ll:.4f}"
-        assert (
-            abs(results.loglike - r_ll) < tol_ll
-        ), f"MS-AR loglike: archbox={results.loglike:.4f}, R={r_ll:.4f}"
+        assert results.loglike >= r_ll - 0.05, (
+            f"archbox loglike {results.loglike:.4f} below MSwM {r_ll:.4f}"
+        )
+        assert abs(results.loglike - r_ll) < tol_ll, (
+            f"MS-AR loglike: archbox={results.loglike:.4f}, R={r_ll:.4f}"
+        )
 
         low, high = sorted_regimes(results)
         assert_close("mu_0", low["mu"], r_params["mu_0"], tol_pct, tol_abs)
@@ -157,9 +157,9 @@ class TestVsMSwM:
         model = MSwMStyleMSAR(self.data, k_regimes=2, order=4)
         results = model.fit(method="em", maxiter=2000, tol=1e-12, verbose=False)
 
-        assert (
-            abs(results.loglike - r_ll) < 0.1
-        ), f"loglike: archbox(MSwM M-step)={results.loglike:.4f}, R={r_ll:.4f}"
+        assert abs(results.loglike - r_ll) < 0.1, (
+            f"loglike: archbox(MSwM M-step)={results.loglike:.4f}, R={r_ll:.4f}"
+        )
 
         low, high = sorted_regimes(results)
         assert_close("mu_0", low["mu"], r_params["mu_0"], 0.02, 0.02)
@@ -184,9 +184,9 @@ class TestVsMSwM:
         results = model.fit(method="em", maxiter=1000, tol=1e-10, verbose=False)
 
         assert np.isfinite(results.loglike)
-        assert (
-            abs(results.loglike - r_ll) < tol_ll
-        ), f"MS-AR(switching) loglike: archbox={results.loglike:.4f}, R={r_ll:.4f}"
+        assert abs(results.loglike - r_ll) < tol_ll, (
+            f"MS-AR(switching) loglike: archbox={results.loglike:.4f}, R={r_ll:.4f}"
+        )
 
         regimes = sorted_regimes(results)
         for rank, rp in enumerate(regimes):

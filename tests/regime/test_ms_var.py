@@ -164,9 +164,9 @@ class TestMSVARCoefficients:
         for rank in range(2):
             est_phi = np.asarray(results.coefficients[int(order[rank])])
             tru_phi = true_phi[int(true_order[rank])]
-            assert (
-                np.max(np.abs(est_phi - tru_phi)) < 0.15
-            ), f"regime {rank}: estimated\n{est_phi}\ntrue\n{tru_phi}"
+            assert np.max(np.abs(est_phi - tru_phi)) < 0.15, (
+                f"regime {rank}: estimated\n{est_phi}\ntrue\n{tru_phi}"
+            )
 
     def test_weighted_least_squares_conditions(self, simulated_ms_var_dynamic):
         """The weighted normal equations hold at the estimates."""
