@@ -38,7 +38,10 @@ class RegimeTransformer:
         context: dict[str, Any] = {}
 
         context["model_name"] = getattr(results, "model_name", "Markov-Switching")
-        context["n_regimes"] = int(getattr(results, "n_regimes", 2))
+        n_regimes = getattr(results, "n_regimes", None)
+        if n_regimes is None:
+            n_regimes = getattr(results, "k_regimes", 2)
+        context["n_regimes"] = int(n_regimes)
         context["n_obs"] = getattr(results, "nobs", 0)
 
         # Transition matrix
@@ -54,12 +57,18 @@ class RegimeTransformer:
                 durations.append({"regime": k + 1, "duration": d})
             context["expected_durations"] = durations
 
-        # Per-regime parameters
+        # Per-regime parameters (a dict keyed by regime index, or a sequence)
         if hasattr(results, "regime_params"):
+            regime_params = results.regime_params
+            items = (
+                regime_params.items()
+                if isinstance(regime_params, dict)
+                else enumerate(regime_params)
+            )
             context["regime_params"] = []
-            for k, params in enumerate(results.regime_params):
+            for k, params in items:
                 regime_ctx = {
-                    "regime": k + 1,
+                    "regime": int(k) + 1,
                     "params": params if isinstance(params, dict) else {"value": params},
                 }
                 context["regime_params"].append(regime_ctx)
@@ -75,7 +84,10 @@ class RegimeTransformer:
             }
 
         # Information criteria
-        context["loglikelihood"] = getattr(results, "loglikelihood", None)
+        loglikelihood = getattr(results, "loglikelihood", None)
+        if loglikelihood is None:
+            loglikelihood = getattr(results, "loglike", None)
+        context["loglikelihood"] = loglikelihood
         context["aic"] = getattr(results, "aic", None)
         context["bic"] = getattr(results, "bic", None)
 

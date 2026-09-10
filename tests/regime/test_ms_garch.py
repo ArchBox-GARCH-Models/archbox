@@ -72,38 +72,74 @@ class TestMSGARCHTwoRegimes:
             assert rp["beta"] >= 0, f"beta_{s} should be non-negative"
 
     def test_gray_collapsing(self, simulated_ms_garch_data):
-        """Test that Gray collapsing produces valid h_{t-1}."""
+        """Gray collapsing uses the filtered probabilities of the same pass."""
         y, _, _, _, _, _ = simulated_ms_garch_data
         model = MarkovSwitchingGARCH(y, k_regimes=2, p=1, q=1)
 
-        # Run one iteration to populate sigma2 and collapsed h
         params = model.start_params
         k = model.k_regimes
         T = model.nobs
 
-        # Compute regime loglikes (populates _sigma2)
-        for s in range(k):
-            model._regime_loglike(params, s)
+        sigma2, h, filtered, _log_eta = model._gray_recursion(params)
 
-        # Create fake filtered probs
-        filtered_probs = np.ones((T, k)) / k
-        model.update_collapsed_variance(filtered_probs)
-
-        h = model._h_collapsed
-        assert h is not None
+        assert sigma2.shape == (T, k)
         assert h.shape == (T,)
+        assert filtered.shape == (T, k)
         assert np.all(h > 0), "Collapsed variance should be positive"
+        assert np.all(sigma2 > 0), "Regime variances should be positive"
+        np.testing.assert_allclose(filtered.sum(axis=1), np.ones(T), atol=1e-10)
 
-        # h should be weighted average of regime variances
-        if model._sigma2 is not None:
-            for t in range(T):
-                expected_h = np.sum(filtered_probs[t] * model._sigma2[t])
-                np.testing.assert_allclose(
-                    h[t],
-                    expected_h,
-                    atol=1e-10,
-                    err_msg=f"h[{t}] should be weighted average",
-                )
+        # h_t = sum_j P(S_t=j | Y_t) * sigma2_t(j)
+        expected_h = np.sum(filtered * sigma2, axis=1)
+        np.testing.assert_allclose(h, expected_h, atol=1e-12)
+
+        # sigma2_t(s) = omega_s + alpha_s * y_{t-1}^2 + beta_s * h_{t-1}
+        for s in range(k):
+            omega, alpha, beta = model._unpack_garch_params(params, s)
+            expected = omega + alpha * y[:-1] ** 2 + beta * h[:-1]
+            np.testing.assert_allclose(sigma2[1:, s], expected, rtol=1e-12)
+
+    def test_regime_loglike_has_no_side_effects(self, simulated_ms_garch_data):
+        """Evaluating a regime density must not mutate the model."""
+        y, _, _, _, _, _ = simulated_ms_garch_data
+        model = MarkovSwitchingGARCH(y, k_regimes=2, p=1, q=1)
+        params = model.start_params
+
+        first = model._regime_loglike(params, 0).copy()
+        model._regime_loglike(params, 1)
+        second = model._regime_loglike(params, 0)
+
+        np.testing.assert_allclose(first, second, atol=0.0)
+        assert not hasattr(model, "_sigma2") or model._sigma2 is None
+
+    def test_loglike_matches_fit(self, simulated_ms_garch_data):
+        """model.loglike(results.params) reproduces results.loglike."""
+        y, _, _, _, _, _ = simulated_ms_garch_data
+        model = MarkovSwitchingGARCH(y, k_regimes=2, p=1, q=1)
+        results = model.fit(maxiter=100, tol=1e-8, verbose=False)
+
+        assert results.converged
+        assert model.loglike(results.params) == pytest.approx(results.loglike, abs=1e-6)
+
+    def test_beats_start_params(self, simulated_ms_garch_data):
+        """The fitted likelihood must improve on the starting values."""
+        y, _, _, _, _, _ = simulated_ms_garch_data
+        model = MarkovSwitchingGARCH(y, k_regimes=2, p=1, q=1)
+        start_ll = model.loglike(model.start_params)
+        results = model.fit(maxiter=200, tol=1e-8, verbose=False)
+
+        assert results.loglike > start_ll
+
+    def test_forecast_variance_positive(self, simulated_ms_garch_data):
+        """Variance forecasts are positive and regime probabilities valid."""
+        y, _, _, _, _, _ = simulated_ms_garch_data
+        model = MarkovSwitchingGARCH(y, k_regimes=2, p=1, q=1)
+        model.fit(maxiter=100, tol=1e-8, verbose=False)
+
+        fc = model.forecast(10)
+        assert np.all(fc["variance"] > 0)
+        np.testing.assert_allclose(fc["mean"], 0.0, atol=1e-12)
+        np.testing.assert_allclose(fc["regime_probs"].sum(axis=1), 1.0, atol=1e-10)
 
     def test_persistence_per_regime(self, simulated_ms_garch_data):
         """Persistence (alpha + beta) should be < 1 per regime."""

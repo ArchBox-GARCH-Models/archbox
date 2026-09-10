@@ -173,6 +173,37 @@ class MarkovSwitchingMean(MarkovSwitchingModel):
 
         return new_params
 
+    def _regime_moments(
+        self, params: NDArray[np.float64]
+    ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+        """Regime means and standard deviations."""
+        k = self.k_regimes
+        mus = np.asarray(params[:k], dtype=np.float64)
+        sigmas = np.full(k, max(abs(float(params[k])), 1e-6))
+        return mus, sigmas
+
+    def _regime_forecast_moments(
+        self,
+        params: NDArray[np.float64],
+        horizon: int,
+        regime_probs: NDArray[np.float64],
+    ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+        """Regime-conditional forecast moments (constant over the horizon)."""
+        mus, sigmas = self._regime_moments(params)
+        means = np.tile(mus, (horizon, 1))
+        variances = np.tile(sigmas**2, (horizon, 1))
+        return means, variances
+
+    def _simulate_observations(
+        self,
+        params: NDArray[np.float64],
+        regimes: NDArray[np.int64],
+        rng: np.random.Generator,
+    ) -> NDArray[np.float64]:
+        """Draw observations from the regime-conditional normals."""
+        mus, sigmas = self._regime_moments(params)
+        return mus[regimes] + sigmas[regimes] * rng.standard_normal(regimes.size)
+
     def _extract_regime_params(self, params: NDArray[np.float64]) -> dict[int, dict[str, float]]:
         """Extract regime parameters."""
         k = self.k_regimes
@@ -330,6 +361,37 @@ class MarkovSwitchingMeanVar(MarkovSwitchingModel):
                 new_params[k + s] = max(np.sqrt(var_s), 1e-6)
 
         return new_params
+
+    def _regime_moments(
+        self, params: NDArray[np.float64]
+    ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+        """Regime means and standard deviations."""
+        k = self.k_regimes
+        mus = np.asarray(params[:k], dtype=np.float64)
+        sigmas = np.maximum(np.abs(np.asarray(params[k : 2 * k], dtype=np.float64)), 1e-6)
+        return mus, sigmas
+
+    def _regime_forecast_moments(
+        self,
+        params: NDArray[np.float64],
+        horizon: int,
+        regime_probs: NDArray[np.float64],
+    ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+        """Regime-conditional forecast moments (constant over the horizon)."""
+        mus, sigmas = self._regime_moments(params)
+        means = np.tile(mus, (horizon, 1))
+        variances = np.tile(sigmas**2, (horizon, 1))
+        return means, variances
+
+    def _simulate_observations(
+        self,
+        params: NDArray[np.float64],
+        regimes: NDArray[np.int64],
+        rng: np.random.Generator,
+    ) -> NDArray[np.float64]:
+        """Draw observations from the regime-conditional normals."""
+        mus, sigmas = self._regime_moments(params)
+        return mus[regimes] + sigmas[regimes] * rng.standard_normal(regimes.size)
 
     def _extract_regime_params(self, params: NDArray[np.float64]) -> dict[int, dict[str, float]]:
         """Extract regime parameters."""
