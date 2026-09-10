@@ -172,3 +172,112 @@ class TestDCCGARCH:
             f"DCC loglike ({dcc_results.loglike:.2f}) should be >= "
             f"CCC loglike ({ccc_results.loglike:.2f})"
         )
+
+
+class TestDCCForecastRecursion:
+    """The DCC forecast must project the stored Q path, not R_T."""
+
+    def test_q_path_stored_on_results(self, dcc_returns):
+        """The full Q path is stored so the forecast never re-derives it from R."""
+        model = DCC(dcc_returns)
+        results = model.fit(disp=False)
+
+        q_path = results.extras["q_path"]
+        assert q_path.shape == (dcc_returns.shape[0], 3, 3)
+        np.testing.assert_allclose(q_path[-1], results.extras["q_last"])
+        # Q_T is *not* R_T: its diagonal is not identically one.
+        assert not np.allclose(np.diag(q_path[-1]), np.ones(3), atol=1e-6)
+
+    def test_forecast_one_step_matches_recursion(self, dcc_returns):
+        """h=1 must equal the in-sample recursion applied one step ahead."""
+        from archbox.multivariate.dcc import normalize_q
+
+        model = DCC(dcc_returns)
+        results = model.fit(disp=False)
+
+        a, b = results.params
+        q_bar = results.extras["q_bar"]
+        q_last = results.extras["q_last"]
+        z_last = results.extras["z_last"]
+
+        q_next = (1.0 - a - b) * q_bar + a * np.outer(z_last, z_last) + b * q_last
+        r_next = normalize_q(q_next)
+
+        fcast = model.forecast(results, horizon=5)
+        np.testing.assert_allclose(fcast["correlation"][0], r_next, rtol=1e-12, atol=1e-14)
+
+    def test_forecast_keeps_the_a_z_z_term(self, dcc_returns):
+        """Dropping a*z_T z_T' would make h=1 equal the pure mean-reverting step."""
+        model = DCC(dcc_returns)
+        results = model.fit(disp=False)
+
+        from archbox.multivariate.dcc import normalize_q
+
+        a, b = results.params
+        q_bar = results.extras["q_bar"]
+        q_last = results.extras["q_last"]
+        without_shock = normalize_q((1.0 - a - b) * q_bar + b * q_last)
+
+        fcast = model.forecast(results, horizon=1)
+        assert not np.allclose(fcast["correlation"][0], without_shock, atol=1e-6)
+
+    def test_forecast_multi_step_recursion(self, dcc_returns):
+        """h>1 uses Q_{T+h} = (1-a-b) Q_bar + (a+b) Q_{T+h-1}."""
+        from archbox.multivariate.dcc import normalize_q
+
+        model = DCC(dcc_returns)
+        results = model.fit(disp=False)
+
+        a, b = results.params
+        q_bar = results.extras["q_bar"]
+        q = results.extras["q_last"]
+        z_last = results.extras["z_last"]
+
+        q = (1.0 - a - b) * q_bar + a * np.outer(z_last, z_last) + b * q
+        q = (1.0 - a - b) * q_bar + (a + b) * q
+
+        fcast = model.forecast(results, horizon=2)
+        np.testing.assert_allclose(fcast["correlation"][1], normalize_q(q), rtol=1e-12)
+
+    def test_forecast_uses_univariate_variance_forecast(self, dcc_returns):
+        """Covariance forecasts must use ArchResults.forecast, not the last sigma."""
+        model = DCC(dcc_returns)
+        results = model.fit(disp=False)
+
+        fcast = model.forecast(results, horizon=6)
+        diag = np.diagonal(fcast["covariance"], axis1=1, axis2=2)
+        for i, res in enumerate(results.univariate_results):
+            np.testing.assert_allclose(diag[:, i], res.forecast(horizon=6)["variance"], rtol=1e-10)
+
+    def test_forecast_rejects_zero_horizon(self, synthetic_returns):
+        """horizon < 1 is a programming error, not a silent empty result."""
+        import pytest
+
+        model = DCC(synthetic_returns)
+        results = model.fit(disp=False)
+        with pytest.raises(ValueError, match="horizon"):
+            model.forecast(results, horizon=0)
+
+
+class TestDCCEstimator:
+    """Estimator quality on data with known DCC dynamics."""
+
+    def test_recovers_true_parameters(self, dcc_returns):
+        """DCC recovers the simulated (a, b) and reports finite standard errors."""
+        model = DCC(dcc_returns)
+        results = model.fit(disp=False)
+
+        a, b = results.params
+        assert results.converged
+        assert abs(a - 0.05) < 0.03, f"a={a} far from 0.05"
+        assert abs(b - 0.90) < 0.10, f"b={b} far from 0.90"
+        assert np.all(np.isfinite(results.std_errors))
+        assert np.all(results.std_errors > 0)
+
+    def test_loglike_beats_ccc_on_dynamic_data(self, dcc_returns):
+        """On dynamic-correlation data DCC must beat CCC by a clear margin."""
+        from archbox.multivariate.ccc import CCC
+
+        ccc = CCC(dcc_returns).fit(disp=False)
+        dcc = DCC(dcc_returns).fit(disp=False)
+        assert dcc.loglike > ccc.loglike + 5.0
