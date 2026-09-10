@@ -90,7 +90,7 @@ def ljung_box_squared(std_resids: object, lags: int = 10) -> LjungBoxResult:
         q_stat += rho_k**2 / (nobs - k)
 
     q_stat = nobs * (nobs + 2) * q_stat
-    pvalue = float(1 - stats.chi2.cdf(q_stat, df=lags))
+    pvalue = float(stats.chi2.sf(q_stat, df=lags))
 
     return LjungBoxResult(
         statistic=float(q_stat),

@@ -16,6 +16,11 @@ from dataclasses import dataclass
 import numpy as np
 from scipy import stats
 
+#: Smallest sample the Engle-Ng auxiliary regression can be run on: one lag is
+#: consumed, four coefficients are estimated and one residual degree of freedom
+#: is needed for the t- and F-statistics.
+MIN_SIGN_BIAS_OBS = 6
+
 
 @dataclass
 class SignBiasResult:
@@ -82,6 +87,13 @@ def sign_bias_test(resids: object, std_resids: object) -> SignBiasResult:
         msg = f"resids and std_resids must have same length, got {len(eps)} and {len(z)}"
         raise ValueError(msg)
 
+    if len(eps) < MIN_SIGN_BIAS_OBS:
+        msg = (
+            f"sign bias test needs at least {MIN_SIGN_BIAS_OBS} observations "
+            f"(4 regressors plus 1 residual degree of freedom), got {len(eps)}"
+        )
+        raise ValueError(msg)
+
     # Dependent variable: z^2_t for t = 1, ..., T-1
     z2 = z[1:] ** 2
     n = len(z2)
@@ -116,13 +128,13 @@ def sign_bias_test(resids: object, std_resids: object) -> SignBiasResult:
 
     # Individual p-values (two-sided t-test)
     sign_bias_t = float(t_stats[1])
-    sign_bias_p = float(2 * (1 - stats.t.cdf(abs(t_stats[1]), df=n - 4)))
+    sign_bias_p = float(2 * stats.t.sf(abs(t_stats[1]), df=n - 4))
 
     neg_sign_t = float(t_stats[2])
-    neg_sign_p = float(2 * (1 - stats.t.cdf(abs(t_stats[2]), df=n - 4)))
+    neg_sign_p = float(2 * stats.t.sf(abs(t_stats[2]), df=n - 4))
 
     pos_sign_t = float(t_stats[3])
-    pos_sign_p = float(2 * (1 - stats.t.cdf(abs(t_stats[3]), df=n - 4)))
+    pos_sign_p = float(2 * stats.t.sf(abs(t_stats[3]), df=n - 4))
 
     # Joint F-test: H0: c_1 = c_2 = c_3 = 0
     r_mat = np.array(
@@ -137,7 +149,7 @@ def sign_bias_test(resids: object, std_resids: object) -> SignBiasResult:
     rb = r_mat @ beta
     middle = r_mat @ xtx_inv @ r_mat.T
     f_stat = float((rb @ np.linalg.inv(middle) @ rb) / (3 * sigma2_hat))
-    f_pvalue = float(1 - stats.f.cdf(f_stat, dfn=3, dfd=n - 4))
+    f_pvalue = float(stats.f.sf(f_stat, dfn=3, dfd=n - 4))
 
     return SignBiasResult(
         sign_bias=(sign_bias_t, sign_bias_p),

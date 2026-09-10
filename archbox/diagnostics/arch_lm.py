@@ -21,6 +21,11 @@ from scipy import stats
 class TestResult:
     """Container for a statistical test result.
 
+    Note
+    ----
+    ``__test__ = False`` keeps pytest from trying to collect this dataclass
+    as a test class because of its ``Test`` prefix.
+
     Attributes
     ----------
     statistic : float
@@ -32,6 +37,8 @@ class TestResult:
     lags : int
         Number of lags used.
     """
+
+    __test__ = False  # not a pytest test class
 
     statistic: float
     pvalue: float
@@ -97,7 +104,7 @@ def arch_lm_test(resids: object, lags: int = 5) -> TestResult:
     r_squared = 0.0 if ss_tot < 1e-20 else 1 - ss_res / ss_tot
 
     lm_stat = n * r_squared
-    pvalue = float(1 - stats.chi2.cdf(lm_stat, df=lags))
+    pvalue = float(stats.chi2.sf(lm_stat, df=lags))
 
     return TestResult(
         statistic=float(lm_stat),

@@ -85,3 +85,29 @@ class TestLjungBoxEdgeCases:
         z = np.random.randn(20)
         with pytest.raises(ValueError, match="lags"):
             ljung_box_squared(z, lags=20)
+
+
+class TestLjungBoxTailPrecision:
+    """p-values come from the survival function, not from 1 - cdf."""
+
+    def test_pvalue_is_positive_deep_in_the_tail(self, rng: np.random.Generator) -> None:
+        from scipy import stats
+
+        n = 3000
+        omega, alpha = 0.1, 0.85
+
+        e = np.empty(n)
+        sigma2 = np.empty(n)
+        sigma2[0] = omega / (1 - alpha)
+        e[0] = np.sqrt(sigma2[0]) * rng.standard_normal()
+        for t in range(1, n):
+            sigma2[t] = omega + alpha * e[t - 1] ** 2
+            e[t] = np.sqrt(sigma2[t]) * rng.standard_normal()
+
+        result = ljung_box_squared(e, lags=10)
+
+        assert result.statistic > 100.0
+        assert result.pvalue > 0.0
+        assert result.pvalue == pytest.approx(
+            float(stats.chi2.sf(result.statistic, df=10)), rel=1e-12
+        )

@@ -140,7 +140,7 @@ def hong_spillover_test(
     q_stat = q_num / q_denom
 
     # One-sided test (right tail)
-    pvalue = float(1 - stats.norm.cdf(q_stat))
+    pvalue = float(stats.norm.sf(q_stat))
 
     return HongSpilloverResult(
         statistic=float(q_stat),
