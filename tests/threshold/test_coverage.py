@@ -33,10 +33,6 @@ class _ConcreteThreshold(ThresholdModel):
         return logistic_transition(s, gamma, c)
 
     @property
-    def start_params(self) -> NDArray[np.float64]:
-        return np.array([1.0, 0.0, 0.5, 0.3, 0.5, 0.3, 1.0, 0.0])
-
-    @property
     def param_names(self) -> list[str]:
         return ["gamma", "c", "const1", "phi1_1", "const2", "phi1_2"]
 
@@ -47,7 +43,7 @@ class _ConcreteThreshold(ThresholdModel):
         resid = resid1 * (1 - g_vals) + resid2 * g_vals
         sigma2_1 = float(np.var(resid1))
         sigma2_2 = float(np.var(resid2))
-        ll = self.loglike(beta1, beta2, sigma2_1, sigma2_2, g_vals)
+        ll = self.loglike([beta1, beta2], [sigma2_1, sigma2_2], g_vals)
         n_params = len(beta1) + len(beta2) + 2
         aic = -2 * ll + 2 * n_params
         bic = -2 * ll + np.log(len(self._y)) * n_params
@@ -58,8 +54,7 @@ class _ConcreteThreshold(ThresholdModel):
             delay=self.delay,
             transition_params={"gamma": 1.0, "c": 0.0},
             transition_params_array=np.array([1.0, 0.0]),
-            params_regime1=beta1,
-            params_regime2=beta2,
+            params_regimes=[beta1, beta2],
             regime_assignments=g_vals,
             transition_values=g_vals,
             resid=resid,
@@ -71,6 +66,7 @@ class _ConcreteThreshold(ThresholdModel):
             order=self.order,
             n_regimes=self.n_regimes,
             endog=self.endog,
+            param_names=self.param_names,
             _model=self,
         )
 
@@ -143,23 +139,23 @@ class TestThresholdModelBase:
         params1 = np.zeros(k)
         params2 = np.zeros(k)
         g = np.full(n, 0.5)
-        ll = model.loglike(params1, params2, 1.0, 1.0, g)
+        ll = model.loglike([params1, params2], [1.0, 1.0], g)
         assert np.isfinite(ll)
 
     def test_forecast(self) -> None:
         model = _ConcreteThreshold(_make_series())
         result = model.fit()
         fc = model.forecast(result, horizon=5)
-        assert "mean" in fc
-        assert len(fc["mean"]) == 5
-        assert np.all(np.isfinite(fc["mean"]))
+        assert isinstance(fc, np.ndarray)
+        assert fc.shape == (5,)
+        assert np.all(np.isfinite(fc))
 
     def test_simulate(self) -> None:
         model = _ConcreteThreshold(_make_series())
         params1 = np.array([0.0, 0.5])
         params2 = np.array([0.0, 0.3])
         trans = np.array([1.0, 0.0])
-        sim = model.simulate(100, params1, params2, trans, sigma=1.0, seed=42)
+        sim = model.simulate(100, [params1, params2], trans, sigma=1.0, seed=42)
         assert len(sim) == 100
         assert np.all(np.isfinite(sim))
 
@@ -263,8 +259,9 @@ class TestThresholdResults:
 
     def test_forecast_via_results(self, results: ThresholdResults) -> None:
         fc = results.forecast(horizon=3)
-        assert "mean" in fc
-        assert len(fc["mean"]) == 3
+        assert isinstance(fc, np.ndarray)
+        assert fc.shape == (3,)
+        assert np.all(np.isfinite(fc))
 
     def test_forecast_no_model_raises(self) -> None:
         model = _ConcreteThreshold(_make_series())
@@ -333,3 +330,131 @@ class TestTransitionPlot:
         g = logistic_transition_order2(s, gamma=100.0, c1=-1.0, c2=1.0)
         assert np.all(g >= 0)
         assert np.all(g <= 1.0)
+
+
+# ============================================================
+# Regression tests for the base-class / results audit findings
+# ============================================================
+
+
+class TestEndogValidation:
+    """ThresholdModel rejects non-finite data (audit finding #6)."""
+
+    def test_nan_endog_raises(self) -> None:
+        y = _make_series(200)
+        y[50] = np.nan
+        with pytest.raises(ValueError, match="non-finite"):
+            _ConcreteThreshold(y, order=1, delay=1)
+
+    def test_inf_endog_raises(self) -> None:
+        y = _make_series(200)
+        y[10] = np.inf
+        with pytest.raises(ValueError, match="non-finite"):
+            _ConcreteThreshold(y, order=1, delay=1)
+
+    def test_finite_endog_accepted(self) -> None:
+        model = _ConcreteThreshold(_make_series(200), order=1, delay=1)
+        assert np.all(np.isfinite(model.endog))
+
+
+class TestRegimeWeights:
+    """G -> per-regime weights, including the three-regime mapping."""
+
+    def test_two_regime_weights(self) -> None:
+        model = _ConcreteThreshold(_make_series(), n_regimes=2)
+        w = model.regime_weights(np.array([0.0, 0.25, 1.0]))
+        assert w.shape == (3, 2)
+        assert np.allclose(w.sum(axis=1), 1.0)
+        assert np.allclose(w[0], [1.0, 0.0])
+        assert np.allclose(w[2], [0.0, 1.0])
+
+    def test_three_regime_weights_select_one_regime(self) -> None:
+        model = _ConcreteThreshold(_make_series(), n_regimes=3)
+        w = model.regime_weights(np.array([0.0, 0.5, 1.0]))
+        assert np.allclose(w, np.eye(3))
+
+    def test_fitted_values_use_all_regimes(self) -> None:
+        model = _ConcreteThreshold(_make_series(), n_regimes=3)
+        x = np.ones((3, 2))
+        betas = [np.array([1.0, 0.0]), np.array([2.0, 0.0]), np.array([3.0, 0.0])]
+        fitted = model.fitted_values(x, np.array([0.0, 0.5, 1.0]), betas)
+        assert np.allclose(fitted, [1.0, 2.0, 3.0])
+
+
+class TestResultsRegimeAliases:
+    """ThresholdResults holds a list of per-regime blocks (audit finding #1)."""
+
+    def test_aliases_match_the_list(self) -> None:
+        model = _ConcreteThreshold(_make_series())
+        res = model.fit()
+        assert np.allclose(res.params_regime1, res.params_regimes[0])
+        assert np.allclose(res.params_regime2, res.params_regimes[1])
+        assert res.params_regime3 is None
+
+    def test_three_blocks_expose_regime3(self) -> None:
+        model = _ConcreteThreshold(_make_series())
+        res = model.fit()
+        res.params_regimes = [np.zeros(2), np.ones(2), np.full(2, 2.0)]
+        assert res.params_regime3 is not None
+        assert np.allclose(res.params_regime3, 2.0)
+
+    def test_test_result_not_collected_by_pytest(self) -> None:
+        assert TestResult.__test__ is False
+
+    def test_forecast_intervals_requires_model(self) -> None:
+        model = _ConcreteThreshold(_make_series())
+        res = model.fit()
+        res._model = None
+        with pytest.raises(RuntimeError, match="Model reference not available"):
+            res.forecast_intervals(horizon=2)
+
+    def test_forecast_intervals_shapes(self) -> None:
+        model = _ConcreteThreshold(_make_series())
+        res = model.fit()
+        out = res.forecast_intervals(horizon=3, n_sims=100, alpha=0.1, seed=1)
+        assert out["paths"].shape == (100, 3)
+        assert np.all(out["lower"] <= out["upper"])
+
+    def test_forecast_rejects_bad_horizon(self) -> None:
+        model = _ConcreteThreshold(_make_series())
+        res = model.fit()
+        with pytest.raises(ValueError, match="horizon must be >= 1"):
+            res.forecast(horizon=0)
+
+
+class TestBaseLoglike:
+    """The generalized loglike is the one the models actually use."""
+
+    def test_matches_manual_gaussian_loglike(self) -> None:
+        model = _ConcreteThreshold(_make_series())
+        beta, resid, _ = ThresholdModel._ols_fit(model._y, model._X)
+        sigma2 = float(np.mean(resid**2))
+        g = np.zeros(len(model._y))
+        ll = model.loglike([beta, beta], [sigma2, sigma2], g)
+        expected = -0.5 * len(resid) * (np.log(2 * np.pi) + np.log(sigma2)) - np.sum(resid**2) / (
+            2 * sigma2
+        )
+        assert np.isclose(ll, expected)
+
+    def test_wrong_sigma2_length_raises(self) -> None:
+        model = _ConcreteThreshold(_make_series())
+        beta = np.zeros(model.order + 1)
+        g = np.zeros(len(model._y))
+        with pytest.raises(ValueError, match="sigma2 must have"):
+            model.loglike([beta, beta], [1.0], g)
+
+
+class TestNoDeadStubs:
+    """Never-called stubs were removed (audit finding #6)."""
+
+    def test_start_params_stub_removed(self) -> None:
+        assert not hasattr(ThresholdModel, "start_params")
+
+    def test_param_names_are_exposed_on_results(self) -> None:
+        from archbox.threshold import TAR
+
+        y = _make_series(400)
+        results = TAR(y, order=1, delay=1).fit()
+        assert results.param_names
+        assert "c" in results.param_names
+        assert any(name.startswith("sigma2") for name in results.param_names)

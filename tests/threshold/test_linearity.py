@@ -230,8 +230,8 @@ class TestIntegration:
 
         # Forecast
         fc = results.forecast(horizon=5)
-        assert len(fc["mean"]) == 5
-        assert np.all(np.isfinite(fc["mean"]))
+        assert fc.shape == (5,)
+        assert np.all(np.isfinite(fc))
 
     def test_full_workflow_setar(self) -> None:
         """Full SETAR workflow with delay selection."""
@@ -273,3 +273,135 @@ class TestIntegration:
         assert tsay_test is not None
         assert hansen_threshold_test is not None
         assert transition_type_test is not None
+
+
+def _simulate_ar2(n: int = 400, seed: int = 0) -> np.ndarray:
+    """Linear AR(2) under H0 of every linearity test."""
+    rng = np.random.default_rng(seed)
+    y = np.zeros(n)
+    for t in range(2, n):
+        y[t] = 0.5 * y[t - 1] - 0.2 * y[t - 2] + rng.standard_normal()
+    return y
+
+
+class TestLinearityDegreesOfFreedom:
+    """Auxiliary regressors must not duplicate existing columns (audit #2)."""
+
+    def test_df_counts_only_added_columns(self) -> None:
+        """With d <= p the terms 1*s^j duplicate lags: df is 3p, not 3(p+1)."""
+        y = _simulate_ar2(n=500, seed=1)
+        result = linearity_test(y, order=2, delay=1)
+        assert "F(6," in result.detail  # 3 * p, not 3 * (p + 1) = 9
+
+    def test_df_full_when_delay_exceeds_order(self) -> None:
+        """With d > p nothing is duplicated and all 3(p+1) columns are used."""
+        y = _simulate_ar2(n=500, seed=1)
+        result = linearity_test(y, order=2, delay=3)
+        assert "F(9," in result.detail
+
+    def test_size_under_h0(self) -> None:
+        """Monte-Carlo size of the LM test under H0 is close to 5%."""
+        n_mc = 200
+        rejections = 0
+        for i in range(n_mc):
+            y = _simulate_ar2(n=400, seed=100 + i)
+            rejections += linearity_test(y, order=2, delay=1).pvalue < 0.05
+        rate = rejections / n_mc
+        assert 0.02 <= rate <= 0.09, f"size {rate:.3f} far from nominal 5%"
+
+    def test_transition_type_sequence_is_full_rank(self) -> None:
+        """The nested F-tests stay computable when d <= p."""
+        y = _simulate_ar2(n=600, seed=2)
+        out = transition_type_test(y, order=2, delay=1)
+        for key in ("F2", "F3", "F4", "p2", "p3", "p4"):
+            assert np.isfinite(out[key]), f"{key} not finite"
+        assert all(0.0 <= out[k] <= 1.0 for k in ("p2", "p3", "p4"))
+
+    def test_transition_type_size_under_h0(self) -> None:
+        """Each stage of the sequence keeps roughly nominal size under H0."""
+        n_mc = 150
+        rej = {"p2": 0, "p3": 0, "p4": 0}
+        for i in range(n_mc):
+            y = _simulate_ar2(n=400, seed=300 + i)
+            out = transition_type_test(y, order=2, delay=1)
+            for key in rej:
+                rej[key] += out[key] < 0.05
+        for key, count in rej.items():
+            rate = count / n_mc
+            assert rate <= 0.12, f"{key} rejects {rate:.3f} of the time under H0"
+
+
+class TestTsayArrangedAutoregression:
+    """Tsay (1989) uses recursive predictive residuals (audit finding #3)."""
+
+    def test_detail_reports_arranged_autoregression(self) -> None:
+        y = _simulate_tar_dgp(n=1000, seed=1)
+        result = tsay_test(y, order=1, delay=1)
+        assert "arranged autoregression" in result.detail
+        assert "m0=" in result.detail
+
+    def test_size_under_h0(self) -> None:
+        """Monte-Carlo size under a linear AR(1) is near 5%."""
+        n_mc = 200
+        rejections = 0
+        for i in range(n_mc):
+            y = _simulate_linear_ar(n=400, seed=500 + i)
+            rejections += tsay_test(y, order=1, delay=1).pvalue < 0.05
+        rate = rejections / n_mc
+        assert 0.01 <= rate <= 0.10, f"size {rate:.3f} far from nominal 5%"
+
+    def test_power_against_tar(self) -> None:
+        """Rejects nearly always for a clear TAR alternative."""
+        n_mc = 40
+        rejections = 0
+        for i in range(n_mc):
+            y = _simulate_tar_dgp(n=400, seed=900 + i)
+            rejections += tsay_test(y, order=1, delay=1).pvalue < 0.05
+        assert rejections / n_mc > 0.9
+
+    def test_detects_slope_only_threshold(self) -> None:
+        """A break in the slope alone (no intercept shift) is detected."""
+        rng = np.random.default_rng(3)
+        n = 600
+        y = np.zeros(n)
+        for t in range(1, n):
+            phi = 0.8 if y[t - 1] <= 0 else -0.8
+            y[t] = phi * y[t - 1] + rng.standard_normal() * 0.5
+        assert tsay_test(y, order=1, delay=1).pvalue < 0.01
+
+
+class TestHansenSupF:
+    """Hansen (1996): sup-F over the grid with a re-fitted wild bootstrap."""
+
+    @staticmethod
+    def _slope_only_tar(n: int = 600, seed: int = 3) -> np.ndarray:
+        rng = np.random.default_rng(seed)
+        y = np.zeros(n)
+        for t in range(1, n):
+            phi = 0.8 if y[t - 1] <= 0 else -0.8
+            y[t] = phi * y[t - 1] + rng.standard_normal() * 0.5
+        return y
+
+    def test_detects_threshold_in_slope_only(self) -> None:
+        """Both regimes have zero intercept: only the AR slope switches."""
+        y = self._slope_only_tar()
+        result = hansen_threshold_test(y, order=1, delay=1, n_bootstrap=299, seed=1)
+        assert result.pvalue < 0.05, f"p={result.pvalue:.4f}"
+        assert result.statistic > 0
+        assert "sup-F" in result.detail
+
+    def test_pvalue_is_strictly_positive(self) -> None:
+        """The bootstrap p-value uses (1 + #exceed) / (1 + B)."""
+        y = self._slope_only_tar(n=400, seed=11)
+        result = hansen_threshold_test(y, order=1, delay=1, n_bootstrap=99, seed=0)
+        assert result.pvalue >= 1.0 / 100.0
+
+    def test_size_under_h0(self) -> None:
+        """Rejection rate under a linear AR(1) stays near the nominal level."""
+        n_mc = 30
+        rejections = 0
+        for i in range(n_mc):
+            y = _simulate_linear_ar(n=300, seed=700 + i)
+            result = hansen_threshold_test(y, order=1, delay=1, n_bootstrap=99, seed=i)
+            rejections += result.pvalue < 0.05
+        assert rejections / n_mc <= 0.20

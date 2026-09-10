@@ -133,6 +133,38 @@ class TestESTAR:
         model = ESTAR(y, order=1, delay=1, gamma_grid=20, c_grid=20)
         results = model.fit()
         fc = results.forecast(horizon=5)
-        assert "mean" in fc
-        assert len(fc["mean"]) == 5
-        assert np.all(np.isfinite(fc["mean"]))
+        assert isinstance(fc, np.ndarray)
+        assert fc.shape == (5,)
+        assert np.all(np.isfinite(fc))
+
+
+class TestESTARGammaScaling:
+    """Gamma is searched in units of 1/var(s) (audit finding #4)."""
+
+    def test_gamma_grid_is_scale_equivariant(self) -> None:
+        """Rescaling by k rescales gamma by 1/k^2 for the exponential transition."""
+        y = _simulate_estar(n=1500, gamma=3.0, c=0.0, seed=42)
+        base = ESTAR(y, order=1, delay=1, gamma_grid=20, c_grid=20).fit()
+        scaled = ESTAR(10.0 * y, order=1, delay=1, gamma_grid=20, c_grid=20).fit()
+
+        ratio = base.transition_params["gamma"] / scaled.transition_params["gamma"]
+        assert abs(ratio - 100.0) < 1e-4 * 100.0
+        assert np.allclose(base.transition_values, scaled.transition_values, atol=1e-6)
+
+    def test_gamma_bound_scales_with_variance(self) -> None:
+        from archbox.datasets import load_dataset
+
+        returns = load_dataset("sp500")["returns"].to_numpy()[:1500]
+        model = ESTAR(returns, order=1, delay=1, gamma_grid=15, c_grid=15)
+        assert model.gamma_max > 500.0
+        assert np.isclose(model.gamma_max, 500.0 / np.var(model._s), rtol=1e-8)
+
+        results = model.fit()
+        assert np.isfinite(results.loglike)
+        assert results.transition_params["gamma"] > 0.0
+
+    def test_converged_flag_present(self) -> None:
+        y = _simulate_estar(n=800, seed=42)
+        results = ESTAR(y, order=1, delay=1, gamma_grid=15, c_grid=15).fit()
+        assert isinstance(results.converged, bool)
+        assert results.converged
