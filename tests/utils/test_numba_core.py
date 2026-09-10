@@ -77,18 +77,72 @@ class TestEGARCHRecursion:
         nobs = 500
         resids = rng.standard_normal(nobs) * 0.01
         omega = -0.1
-        alpha = 0.12
-        gamma = -0.05
-        beta = 0.98
-        backcast = float(np.log(np.var(resids)))
+        alphas = np.array([0.12])
+        gammas = np.array([-0.05])
+        betas = np.array([0.98])
+        log_backcast = float(np.log(np.var(resids)))
 
         log_sigma2_numba = np.empty(nobs)
         log_sigma2_python = np.empty(nobs)
 
-        egarch_recursion_numba(resids, log_sigma2_numba, omega, alpha, gamma, beta, backcast)
-        egarch_recursion_python(resids, log_sigma2_python, omega, alpha, gamma, beta, backcast)
+        egarch_recursion_numba(
+            resids, log_sigma2_numba, omega, alphas, gammas, betas, 1, 1, log_backcast
+        )
+        egarch_recursion_python(
+            resids, log_sigma2_python, omega, alphas, gammas, betas, 1, 1, log_backcast
+        )
 
-        np.testing.assert_allclose(log_sigma2_numba, log_sigma2_python, rtol=1e-10)
+        np.testing.assert_allclose(log_sigma2_numba, log_sigma2_python, rtol=1e-10, atol=1e-12)
+
+    def test_numba_matches_python_higher_order(self):
+        """Numba and Python EGARCH(2,2) recursions agree to 1e-10."""
+        rng = np.random.default_rng(7)
+        nobs = 400
+        resids = rng.standard_normal(nobs) * 0.02
+        omega = -0.2
+        alphas = np.array([0.10, 0.04])
+        gammas = np.array([-0.06, 0.02])
+        betas = np.array([0.60, 0.38])
+        log_backcast = float(np.log(np.var(resids)))
+
+        log_sigma2_numba = np.empty(nobs)
+        log_sigma2_python = np.empty(nobs)
+
+        egarch_recursion_numba(
+            resids, log_sigma2_numba, omega, alphas, gammas, betas, 2, 2, log_backcast
+        )
+        egarch_recursion_python(
+            resids, log_sigma2_python, omega, alphas, gammas, betas, 2, 2, log_backcast
+        )
+
+        np.testing.assert_allclose(log_sigma2_numba, log_sigma2_python, rtol=1e-10, atol=1e-12)
+
+    def test_model_uses_backend_kernel(self):
+        """EGARCH._variance_recursion goes through the backend and matches the kernel."""
+        from archbox.models.egarch import EGARCH
+        from archbox.utils.backend import get_egarch_recursion
+
+        rng = np.random.default_rng(11)
+        returns = rng.standard_normal(300) * 0.01
+        model = EGARCH(returns, p=1, q=1, mean="zero")
+        params = np.array([-0.1, 0.12, -0.05, 0.98])
+        backcast = model._backcast(model.endog)
+
+        sigma2 = model._variance_recursion(params, model.endog, backcast)
+
+        log_sigma2 = np.empty(len(model.endog))
+        expected = get_egarch_recursion()(
+            model.endog,
+            log_sigma2,
+            params[0],
+            params[1:2],
+            params[2:3],
+            params[3:4],
+            1,
+            1,
+            float(np.log(backcast)),
+        )
+        np.testing.assert_allclose(sigma2, np.exp(expected), rtol=1e-10, atol=1e-300)
 
 
 class TestHamiltonFilter:

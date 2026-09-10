@@ -207,6 +207,47 @@ class ComponentGARCH(VolatilityModel):
         """Number of parameters: omega, alpha, beta, alpha_p, beta_p."""
         return 5
 
+    # --- Simulation ---
+
+    def _simulate_state(
+        self,
+        var_params: NDArray[np.float64],
+        backcast: float,
+    ) -> dict[str, Any]:
+        """Carry the permanent/transitory split across simulation steps."""
+        del var_params
+        return {"q": float(backcast), "h": 0.0}
+
+    def _simulate_next_variance(
+        self,
+        var_params: NDArray[np.float64],
+        eps: NDArray[np.float64],
+        sigma2: NDArray[np.float64],
+        t: int,
+        backcast: float,
+        state: dict[str, Any],
+    ) -> float:
+        """One Component-GARCH simulation step (same recursion as the filter)."""
+        del backcast
+        params = np.asarray(var_params, dtype=np.float64)
+        omega = float(params[0])
+        alpha = float(params[1])
+        beta = float(params[2])
+        alpha_p = float(params[3])
+        beta_p = float(params[4])
+
+        eps2 = float(eps[t - 1]) ** 2
+        q_prev = float(state["q"])
+        h_prev = float(state["h"])
+        sigma2_prev = float(sigma2[t - 1])
+
+        q_next = omega + beta_p * (q_prev - omega) + alpha_p * (eps2 - sigma2_prev)
+        q_next = max(q_next, 1e-12)
+        h_next = alpha * (eps2 - q_prev) + beta * h_prev
+        state["q"] = q_next
+        state["h"] = h_next
+        return max(q_next + h_next, 1e-12)
+
     # --- Model-level moments and forecasts ---
 
     def persistence(

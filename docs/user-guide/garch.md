@@ -47,5 +47,5 @@ print(forecast)
 ## Simulation
 
 ```python
-sim_returns, sim_vol = model.simulate(n=1000, params=results.params, seed=42)
+sim_returns, sim_var = model.simulate(n=1000, params=results.params, seed=42)
 ```

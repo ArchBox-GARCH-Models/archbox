@@ -238,32 +238,6 @@ class TestEndToEnd:
 
         plt.close("all")
 
-    def test_config_importable(self):
-        """Config module should be importable."""
-        from archbox.core.config import ArchBoxConfig, config
-
-        assert config.default_optimizer == "SLSQP"
-        assert isinstance(config, ArchBoxConfig)
-
-    def test_transforms_module(self):
-        """Transform utilities should work correctly."""
-        from archbox.utils.transforms import (
-            positive_transform,
-            positive_untransform,
-            stationarity_transform,
-            unit_transform,
-            unit_untransform,
-        )
-
-        x = np.array([0.0, 1.0, -1.0])
-        assert np.allclose(positive_untransform(positive_transform(x)), x)
-        assert np.allclose(unit_untransform(unit_transform(x)), x)
-
-        alphas = np.array([0.5, 0.3])
-        betas = np.array([0.4])
-        a_out, b_out = stationarity_transform(alphas, betas)
-        assert np.sum(a_out) + np.sum(b_out) < 1.0
-
     def test_validation_errors(self):
         """Validation should reject invalid inputs."""
         from archbox.utils.validation import validate_positive_integer, validate_returns

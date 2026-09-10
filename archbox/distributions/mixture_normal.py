@@ -8,11 +8,13 @@ Unit variance constraint: p * sigma1^2 + (1-p) * sigma2^2 = 1
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 from numpy.typing import NDArray
 from scipy import stats
 
-from archbox.distributions.base import Distribution
+from archbox.distributions.base import Distribution, as_scalar_or_array
 
 
 class MixtureNormal(Distribution):
@@ -30,6 +32,14 @@ class MixtureNormal(Distribution):
     """
 
     name = "Mixture Normal"
+
+    #: Shape-parameter bounds. ``transform_params`` maps onto these open
+    #: intervals and ``_get_p_sigma1`` clamps to them, so transform, clamp and
+    #: ``bounds()`` agree and the optimum stays interior.
+    P_MIN: float = 0.01
+    P_MAX: float = 0.99
+    SIGMA1_MIN: float = 0.01
+    SIGMA1_MAX: float = 5.0
 
     def __init__(self, p: float | None = None, sigma1: float | None = None) -> None:
         """Initialize Mixture Normal distribution with optional parameters."""
@@ -66,25 +76,38 @@ class MixtureNormal(Distribution):
         return np.array(params, dtype=np.float64) if params else np.array([], dtype=np.float64)
 
     def _get_p_sigma1(self, dist_params: NDArray[np.float64] | None = None) -> tuple[float, float]:
-        """Extract p and sigma1 from dist_params or fixed values."""
+        """Extract p and sigma1 from ``dist_params`` or the fixed values.
+
+        Estimated parameters are clamped to the declared ``bounds()`` (the
+        intervals ``transform_params`` maps onto); parameters fixed by the user
+        are only clamped to the validity domain (``0 < p < 1``, ``sigma1 > 0``).
+        """
         idx = 0
+        p_fixed = self._fixed_p is not None
         if self._fixed_p is not None:
-            p = self._fixed_p
+            p = float(self._fixed_p)
         elif dist_params is not None and idx < len(dist_params):
             p = float(dist_params[idx])
             idx += 1
         else:
             p = 0.5
 
+        sigma1_fixed = self._fixed_sigma1 is not None
         if self._fixed_sigma1 is not None:
-            sigma1 = self._fixed_sigma1
+            sigma1 = float(self._fixed_sigma1)
         elif dist_params is not None and idx < len(dist_params):
             sigma1 = float(dist_params[idx])
         else:
             sigma1 = 0.5
 
-        p = float(np.clip(p, 0.01, 0.99))
-        sigma1 = max(sigma1, 0.01)
+        if p_fixed:
+            p = float(np.clip(p, 1e-6, 1.0 - 1e-6))
+        else:
+            p = float(np.clip(p, self.P_MIN, self.P_MAX))
+        if sigma1_fixed:
+            sigma1 = max(sigma1, 1e-6)
+        else:
+            sigma1 = float(np.clip(sigma1, self.SIGMA1_MIN, self.SIGMA1_MAX))
         return p, sigma1
 
     @staticmethod
@@ -153,10 +176,13 @@ class MixtureNormal(Distribution):
         ll = -0.5 * np.log(sigma2) + np.log(mixture_density)
         return ll
 
-    def ppf(self, q: float) -> float:
-        """Percent point function for Mixture Normal.
+    def _ppf_scalar(self, q: float) -> float:
+        """Invert the mixture CDF at a single probability.
 
-        Uses numerical inversion via Brent's method.
+        The bracket starts at the widest component scale and **expands
+        geometrically** until it straddles the root, so quantiles deep in the
+        tails (small ``q``) work for any admissible ``(p, sigma1)`` instead of
+        failing on a hard-coded [-50, 50] window.
 
         Parameters
         ----------
@@ -170,32 +196,72 @@ class MixtureNormal(Distribution):
         """
         from scipy.optimize import brentq
 
+        if not 0.0 < q < 1.0:
+            msg = f"q must be in (0, 1), got {q}."
+            raise ValueError(msg)
+
+        p, sigma1 = self._get_p_sigma1()
+        sigma2_comp = self._compute_sigma2(p, sigma1)
+        scale = max(sigma1, sigma2_comp, 1.0)
+
         def _cdf_minus_q(x: float) -> float:
             """Compute CDF(x) - q for root finding."""
-            return self.cdf(x) - q
+            return float(self.cdf(x)) - q
 
-        result: float = brentq(_cdf_minus_q, -50.0, 50.0)  # type: ignore[assignment]
-        return result
+        lo = -10.0 * scale
+        hi = 10.0 * scale
+        for _ in range(60):
+            if _cdf_minus_q(lo) < 0.0 < _cdf_minus_q(hi):
+                break
+            lo *= 2.0
+            hi *= 2.0
+        else:  # pragma: no cover - only reachable for degenerate parameters
+            msg = f"Could not bracket the mixture-normal quantile for q={q}."
+            raise ValueError(msg)
 
-    def cdf(self, x: float) -> float:
+        root: float = brentq(_cdf_minus_q, lo, hi)  # type: ignore[assignment]
+        return float(root)
+
+    def ppf(self, q: float | NDArray[np.float64]) -> Any:
+        """Percent point function for Mixture Normal.
+
+        Uses numerical inversion via Brent's method with an adaptive bracket.
+
+        Parameters
+        ----------
+        q : float or ndarray
+            Quantile(s) in (0, 1).
+
+        Returns
+        -------
+        float or ndarray
+            Value x such that P(Z <= x) = q.
+        """
+        q_arr = np.asarray(q, dtype=np.float64)
+        values = np.array([self._ppf_scalar(float(v)) for v in q_arr.ravel()], dtype=np.float64)
+        return as_scalar_or_array(values.reshape(q_arr.shape), q)
+
+    def cdf(self, x: float | NDArray[np.float64]) -> Any:
         """CDF for Mixture Normal.
 
         Parameters
         ----------
-        x : float
-            Value.
+        x : float or ndarray
+            Value(s).
 
         Returns
         -------
-        float
+        float or ndarray
             P(Z <= x).
         """
         p, sigma1 = self._get_p_sigma1()
         sigma2_comp = self._compute_sigma2(p, sigma1)
 
-        return float(
-            p * stats.norm.cdf(x, scale=sigma1) + (1 - p) * stats.norm.cdf(x, scale=sigma2_comp)
-        )
+        x_arr = np.asarray(x, dtype=np.float64)
+        values = p * np.asarray(stats.norm.cdf(x_arr, scale=sigma1), dtype=np.float64) + (
+            1 - p
+        ) * np.asarray(stats.norm.cdf(x_arr, scale=sigma2_comp), dtype=np.float64)
+        return as_scalar_or_array(values, x)
 
     def simulate(
         self,
@@ -217,52 +283,70 @@ class MixtureNormal(Distribution):
         Returns
         -------
         ndarray
-            Random variates with unit variance.
+            Random variates with mean 0 and unit variance.
         """
         p, sigma1 = self._get_p_sigma1(dist_params)
         sigma2_comp = self._compute_sigma2(p, sigma1)
 
-        # Select component
+        # One standard normal per draw, scaled by the selected component's
+        # standard deviation: exactly the density used by `loglikelihood`
+        # (symmetric, so the empirical CDF at 0 matches cdf(0) = 0.5).
         component = rng.uniform(size=n) < p
-        z = np.where(
-            component,
-            rng.normal(0, sigma1, size=n),
-            rng.normal(0, sigma2_comp, size=n),
-        )
-        return z
+        scales = np.where(component, sigma1, sigma2_comp)
+        return np.asarray(rng.standard_normal(n) * scales, dtype=np.float64)
+
+    @staticmethod
+    def _logistic(x: float, low: float, high: float) -> float:
+        """Map the real line onto the open interval ``(low, high)``."""
+        weight = 1.0 / (1.0 + np.exp(-np.clip(x, -50.0, 50.0)))
+        return float(low + (high - low) * weight)
+
+    @staticmethod
+    def _logit(value: float, low: float, high: float) -> float:
+        """Inverse of :meth:`_logistic`."""
+        weight = (value - low) / (high - low)
+        weight = float(np.clip(weight, 1e-8, 1.0 - 1e-8))
+        return float(np.log(weight / (1.0 - weight)))
 
     def transform_params(self, unconstrained: NDArray[np.float64]) -> NDArray[np.float64]:
-        """Transform: p = sigmoid(x), sigma1 = exp(x)."""
+        """Map to ``p`` in ``(P_MIN, P_MAX)`` and ``sigma1`` in ``(SIGMA1_MIN, SIGMA1_MAX)``.
+
+        Both land strictly inside the declared ``bounds()``, matching the
+        clamps applied in ``_get_p_sigma1``.
+        """
         if len(unconstrained) == 0:
             return unconstrained
         constrained = unconstrained.copy()
         idx = 0
         if self._fixed_p is None:
-            constrained[idx] = 1.0 / (1.0 + np.exp(-unconstrained[idx]))
+            constrained[idx] = self._logistic(float(unconstrained[idx]), self.P_MIN, self.P_MAX)
             idx += 1
         if self._fixed_sigma1 is None:
-            constrained[idx] = np.exp(unconstrained[idx])
+            constrained[idx] = self._logistic(
+                float(unconstrained[idx]), self.SIGMA1_MIN, self.SIGMA1_MAX
+            )
         return constrained
 
     def untransform_params(self, constrained: NDArray[np.float64]) -> NDArray[np.float64]:
-        """Inverse transform distribution parameters."""
+        """Inverse of :meth:`transform_params`."""
         if len(constrained) == 0:
             return constrained
         unconstrained = constrained.copy()
         idx = 0
         if self._fixed_p is None:
-            p = float(np.clip(constrained[idx], 1e-6, 1 - 1e-6))
-            unconstrained[idx] = np.log(p / (1.0 - p))
+            unconstrained[idx] = self._logit(float(constrained[idx]), self.P_MIN, self.P_MAX)
             idx += 1
         if self._fixed_sigma1 is None:
-            unconstrained[idx] = np.log(max(constrained[idx], 1e-6))
+            unconstrained[idx] = self._logit(
+                float(constrained[idx]), self.SIGMA1_MIN, self.SIGMA1_MAX
+            )
         return unconstrained
 
     def bounds(self) -> list[tuple[float, float]]:
         """Parameter bounds."""
         bnds: list[tuple[float, float]] = []
         if self._fixed_p is None:
-            bnds.append((0.01, 0.99))
+            bnds.append((self.P_MIN, self.P_MAX))
         if self._fixed_sigma1 is None:
-            bnds.append((0.01, 5.0))
+            bnds.append((self.SIGMA1_MIN, self.SIGMA1_MAX))
         return bnds

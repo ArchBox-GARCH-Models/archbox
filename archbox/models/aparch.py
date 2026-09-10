@@ -201,6 +201,38 @@ class APARCH(VolatilityModel):
         """Number of model parameters: omega + q alphas + q gammas + p betas + delta."""
         return 1 + 2 * self.q + self.p + 1
 
+    # --- Simulation ---
+
+    def _simulate_next_variance(
+        self,
+        var_params: NDArray[np.float64],
+        eps: NDArray[np.float64],
+        sigma2: NDArray[np.float64],
+        t: int,
+        backcast: float,
+        state: dict[str, Any],
+    ) -> float:
+        """One APARCH simulation step on the sigma^delta recursion."""
+        del state
+        omega, alphas, gammas, betas, delta = self._aparch_blocks(var_params)
+        backcast_delta = backcast ** (delta / 2.0)
+        sigma_delta = float(omega)
+        for i in range(self.q):
+            lag = t - 1 - i
+            if lag >= 0:
+                e = float(eps[lag])
+                shock = max(abs(e) - float(gammas[i]) * e, 0.0)
+                sigma_delta += float(alphas[i]) * shock**delta
+            else:
+                sigma_delta += float(alphas[i]) * backcast_delta
+        for j in range(self.p):
+            lag = t - 1 - j
+            prev = float(sigma2[lag]) ** (delta / 2.0) if lag >= 0 else backcast_delta
+            sigma_delta += float(betas[j]) * prev
+        sigma_delta = max(sigma_delta, 1e-300)
+        value = float(sigma_delta ** (2.0 / delta))
+        return value if np.isfinite(value) else 1e-12
+
     # --- Model-level moments and forecasts ---
 
     #: Monte-Carlo settings (fixed for reproducibility).

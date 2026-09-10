@@ -323,15 +323,6 @@ fig = result.plot(which='volatility')
 
 ---
 
-## Config
-
-::: archbox.core.config.ArchBoxConfig
-    options:
-      show_root_heading: true
-      show_source: true
-
----
-
 ## Excepcoes
 
 ::: archbox.core.exceptions

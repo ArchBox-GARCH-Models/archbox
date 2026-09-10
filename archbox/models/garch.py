@@ -42,6 +42,10 @@ class GARCH(VolatilityModel):
 
     volatility_process: str = "GARCH"
 
+    #: Variance targeting rebuilds omega from ``var * (1 - sum(alpha) - sum(beta))``,
+    #: which is exactly the plain GARCH layout, so it is supported here (and only here).
+    supports_variance_targeting: bool = True
+
     def __init__(
         self,
         endog: Any,

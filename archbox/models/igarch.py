@@ -143,6 +143,25 @@ class IGARCH(VolatilityModel):
         """Number of model parameters (omega, alpha). beta = 1-alpha is implicit."""
         return 2
 
+    # --- Simulation ---
+
+    def _simulate_next_variance(
+        self,
+        var_params: NDArray[np.float64],
+        eps: NDArray[np.float64],
+        sigma2: NDArray[np.float64],
+        t: int,
+        backcast: float,
+        state: dict[str, Any],
+    ) -> float:
+        """One IGARCH simulation step (beta = 1 - alpha)."""
+        del backcast, state
+        omega = float(var_params[0])
+        alpha = float(var_params[1])
+        beta = 1.0 - alpha
+        value = omega + alpha * float(eps[t - 1]) ** 2 + beta * float(sigma2[t - 1])
+        return max(value, 1e-12)
+
     # --- Model-level moments and forecasts ---
 
     def persistence(

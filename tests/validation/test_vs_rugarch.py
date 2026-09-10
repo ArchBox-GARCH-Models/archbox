@@ -98,7 +98,23 @@ class TestVsRugarchGARCH:
             abs(results.loglike - fixture["loglikelihood"]) < tol_ll
         ), f"loglike: archbox={results.loglike:.2f}, R={fixture['loglikelihood']:.2f}"
 
-    @pytest.mark.xfail(reason="Student-t distribution not yet implemented")
+    @pytest.mark.xfail(
+        strict=True,
+        reason=(
+            "The rugarch_garch11_studentt fixture is inconsistent with the dataset. "
+            "archbox's synthetic sp500 is generated with NORMAL innovations "
+            "(datasets/generate_datasets.py::_simulate_garch draws standard_normal), so "
+            "the standardized-t profile log-likelihood increases monotonically in nu and "
+            "converges to the Normal value: ll(nu=8) = 7710.6, ll(nu=20) = 7723.1, "
+            "ll(nu=100) = 7726.1, vs 7726.0 for the Normal fit that matches its own "
+            "rugarch fixture to 0.1. The fixture's reference (shape = 8.0, ll = 7730.0) "
+            "is therefore unattainable for ANY correct standardized-t implementation on "
+            "this data, and the 3.9 gap is in the fixture, not in archbox: our density is "
+            "the unit-variance t used by rugarch's 'std', the mean is removed the same "
+            "way, and the backcast only moves the ll by a fraction of a point. "
+            "Regenerate the fixture from R on this exact series to re-enable."
+        ),
+    )
     def test_garch11_studentt(self) -> None:
         """GARCH(1,1) Student-t vs rugarch."""
         fixture = load_fixture("rugarch_garch11_studentt.json")
@@ -111,6 +127,24 @@ class TestVsRugarchGARCH:
 
         assert results.params is not None
         assert abs(results.loglike - fixture["loglikelihood"]) < tol_ll
+
+    def test_garch11_studentt_beats_normal_limit(self) -> None:
+        """The Student-t fit dominates the Normal one and converges to it as nu grows.
+
+        Guards the property the (unusable) rugarch fixture was meant to check:
+        the standardized-t likelihood nests the Normal, so on normal-innovation
+        data the optimum sits at a large nu with a log-likelihood just above the
+        Normal fit.
+        """
+        from archbox.models.garch import GARCH
+
+        res_n = GARCH(self.returns, p=1, q=1, dist="normal").fit(disp=False)
+        res_t = GARCH(self.returns, p=1, q=1, dist="studentt").fit(disp=False)
+
+        assert res_t.loglike >= res_n.loglike
+        assert res_t.loglike - res_n.loglike < 1.0
+        nu = dict(zip(res_t.param_names, res_t.params, strict=True))["nu"]
+        assert nu > 20.0, f"nu should be large on normal-innovation data, got {nu}"
 
     def test_egarch11_normal(self) -> None:
         """EGARCH(1,1) Normal vs rugarch."""
@@ -167,7 +201,6 @@ class TestParameterConsistency:
         sp500 = load_dataset("sp500")
         self.returns = sp500["returns"].to_numpy(dtype=np.float64)
 
-    @pytest.mark.xfail(reason="Student-t distribution not yet implemented")
     def test_studentt_loglike_better_than_normal(self) -> None:
         """Student-t should have better (higher) loglike than Normal on fat-tailed data."""
         from archbox.models.garch import GARCH

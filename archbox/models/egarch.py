@@ -54,7 +54,11 @@ class EGARCH(VolatilityModel):
         resids: NDArray[np.float64],
         backcast: float,
     ) -> NDArray[np.float64]:
-        """Compute conditional variance via EGARCH recursion.
+        """Compute conditional variance via the EGARCH recursion.
+
+        Runs through :func:`archbox.utils.backend.get_egarch_recursion`, so the
+        numba kernel is used when available and the pure-Python fallback
+        otherwise; both produce identical values.
 
         Parameters
         ----------
@@ -70,32 +74,30 @@ class EGARCH(VolatilityModel):
         ndarray
             Conditional variance series sigma^2_t.
         """
-        omega = params[0]
-        alphas = params[1 : 1 + self.q]
-        gammas = params[1 + self.q : 1 + 2 * self.q]
-        betas = params[1 + 2 * self.q : 1 + 2 * self.q + self.p]
+        from archbox.utils.backend import get_egarch_recursion
+
+        omega = float(params[0])
+        alphas = np.asarray(params[1 : 1 + self.q], dtype=np.float64)
+        gammas = np.asarray(params[1 + self.q : 1 + 2 * self.q], dtype=np.float64)
+        betas = np.asarray(params[1 + 2 * self.q : 1 + 2 * self.q + self.p], dtype=np.float64)
 
         nobs = len(resids)
         log_sigma2 = np.empty(nobs)
-        log_backcast = np.log(max(backcast, 1e-12))
+        log_backcast = float(np.log(max(backcast, 1e-12)))
 
-        for t in range(nobs):
-            log_sigma2[t] = omega
-            for j in range(self.p):
-                lag = t - 1 - j
-                log_sigma2[t] += betas[j] * (log_sigma2[lag] if lag >= 0 else log_backcast)
-            for i in range(self.q):
-                lag = t - 1 - i
-                if lag >= 0:
-                    prev_sigma = np.sqrt(np.exp(log_sigma2[lag]))
-                    z = resids[lag] / max(prev_sigma, 1e-6)
-                else:
-                    z = 0.0
-                log_sigma2[t] += alphas[i] * (np.abs(z) - np.sqrt(2.0 / np.pi))
-                log_sigma2[t] += gammas[i] * z
-
-        sigma2 = np.exp(log_sigma2)
-        return sigma2
+        recursion_fn = get_egarch_recursion()
+        log_sigma2 = recursion_fn(
+            np.asarray(resids, dtype=np.float64),
+            log_sigma2,
+            omega,
+            alphas,
+            gammas,
+            betas,
+            self.p,
+            self.q,
+            log_backcast,
+        )
+        return np.exp(log_sigma2)
 
     def _one_step_variance(
         self, eps: float, sigma2_prev: float, params: NDArray[np.float64]
@@ -190,6 +192,38 @@ class EGARCH(VolatilityModel):
     def num_params(self) -> int:
         """Number of model parameters."""
         return 1 + 2 * self.q + self.p
+
+    # --- Simulation ---
+
+    def _simulate_next_variance(
+        self,
+        var_params: NDArray[np.float64],
+        eps: NDArray[np.float64],
+        sigma2: NDArray[np.float64],
+        t: int,
+        backcast: float,
+        state: dict[str, Any],
+    ) -> float:
+        """One EGARCH simulation step on the log-variance recursion."""
+        del state
+        omega, alphas, gammas, betas = self._egarch_blocks(var_params)
+        log_backcast = np.log(max(backcast, 1e-12))
+        log_sigma2 = float(omega)
+        for j in range(self.p):
+            lag = t - 1 - j
+            log_sigma2 += float(betas[j]) * (
+                float(np.log(max(float(sigma2[lag]), 1e-12))) if lag >= 0 else float(log_backcast)
+            )
+        for i in range(self.q):
+            lag = t - 1 - i
+            if lag >= 0:
+                prev_sigma = np.sqrt(max(float(sigma2[lag]), 1e-12))
+                z = float(eps[lag]) / max(prev_sigma, 1e-6)
+            else:
+                z = 0.0
+            log_sigma2 += float(alphas[i]) * (abs(z) - np.sqrt(2.0 / np.pi))
+            log_sigma2 += float(gammas[i]) * z
+        return float(max(np.exp(np.clip(log_sigma2, -700.0, 700.0)), 1e-12))
 
     # --- Model-level moments and forecasts ---
 

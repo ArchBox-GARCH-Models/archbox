@@ -219,6 +219,47 @@ class FIGARCH(VolatilityModel):
         """Number of parameters: omega, phi, d, beta."""
         return 4
 
+    # --- Simulation ---
+
+    def _simulate_state(
+        self,
+        var_params: NDArray[np.float64],
+        backcast: float,
+    ) -> dict[str, Any]:
+        """Cache the truncated ARCH(infinity) weights used by every step."""
+        del backcast
+        params = np.asarray(var_params, dtype=np.float64)
+        phi = float(params[1])
+        d = float(params[2])
+        beta = float(params[3])
+        omega = float(params[0])
+        n_lags = max(int(self.truncation_lag), 1)
+        return {
+            "lam": self._compute_lambda_coefficients(phi, d, beta, n_lags),
+            "omega_star": omega / (1.0 - beta) if abs(1.0 - beta) > 1e-10 else omega,
+            "n_lags": n_lags,
+        }
+
+    def _simulate_next_variance(
+        self,
+        var_params: NDArray[np.float64],
+        eps: NDArray[np.float64],
+        sigma2: NDArray[np.float64],
+        t: int,
+        backcast: float,
+        state: dict[str, Any],
+    ) -> float:
+        """One FIGARCH simulation step via the truncated lambda weights."""
+        del var_params, sigma2, backcast
+        lam: NDArray[np.float64] = state["lam"]
+        n_lags = int(state["n_lags"])
+        n_used = min(t, n_lags)
+        if n_used == 0:
+            return max(float(state["omega_star"]), 1e-12)
+        past = eps[t - n_used : t][::-1] ** 2
+        value = float(state["omega_star"]) + float(np.dot(lam[:n_used], past))
+        return max(value, 1e-12)
+
     # --- Model-level moments and forecasts ---
 
     def persistence(

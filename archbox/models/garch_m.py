@@ -64,13 +64,11 @@ class GARCHM(VolatilityModel):
 
     def _risk_premium_function(self, sigma2: float) -> float:
         """Compute the risk premium term f(sigma^2)."""
-        if self.risk_premium == "variance":
-            return sigma2
-        elif self.risk_premium == "volatility":
-            return np.sqrt(max(sigma2, 1e-12))
-        elif self.risk_premium == "log_variance":
-            return np.log(max(sigma2, 1e-12))
-        return sigma2
+        if self.risk_premium == "volatility":
+            return float(np.sqrt(max(sigma2, 1e-12)))
+        if self.risk_premium == "log_variance":
+            return float(np.log(max(sigma2, 1e-12)))
+        return float(sigma2)
 
     def _variance_recursion(
         self,
@@ -116,6 +114,33 @@ class GARCHM(VolatilityModel):
 
         return sigma2
 
+    def _garchm_blocks(
+        self, params: NDArray[np.float64]
+    ) -> tuple[float, NDArray[np.float64], NDArray[np.float64], float]:
+        """Split the variance block into ``(omega, alphas, betas, lambda)``.
+
+        Only the leading ``num_params`` entries are read, so the full
+        ``[variance block, distribution block]`` vector may be passed: the
+        in-mean coefficient is ``params[num_params - 1]``, never ``params[-1]``
+        (which is a distribution shape parameter when ``dist != 'normal'``).
+
+        Parameters
+        ----------
+        params : ndarray
+            Full or variance-only parameter vector.
+
+        Returns
+        -------
+        tuple
+            ``(omega, alphas, betas, lambda)``.
+        """
+        block = np.asarray(params, dtype=np.float64)[: self.num_params]
+        omega = float(block[0])
+        alphas = block[1 : 1 + self.q]
+        betas = block[1 + self.q : 1 + self.q + self.p]
+        lam = float(block[1 + self.q + self.p])
+        return omega, alphas, betas, lam
+
     def _garchm_joint_recursion(
         self,
         params: NDArray[np.float64],
@@ -131,10 +156,7 @@ class GARCHM(VolatilityModel):
         tuple
             (sigma2, adjusted_resids)
         """
-        omega = params[0]
-        alphas = params[1 : 1 + self.q]
-        betas = params[1 + self.q : 1 + self.q + self.p]
-        lam = params[-1]
+        omega, alphas, betas, lam = self._garchm_blocks(params)
 
         nobs = len(self.endog)
         sigma2 = np.empty(nobs)
@@ -159,7 +181,10 @@ class GARCHM(VolatilityModel):
     def loglike(self, params: NDArray[np.float64], backcast: float | None = None) -> float:
         """Compute log-likelihood for GARCH-M.
 
-        Uses joint forward pass where eps_t = r_t - lambda * f(sigma2_t).
+        Uses the joint forward pass where ``eps_t = r_t - lambda f(sigma2_t)``.
+        ``params`` is the combined vector ``[omega, alpha.., beta.., lambda]``
+        followed by the distribution shape parameters, which are forwarded to
+        the conditional distribution.
         """
         if backcast is None:
             backcast = self._backcast(self.endog)
@@ -170,7 +195,8 @@ class GARCHM(VolatilityModel):
         if not np.all(np.isfinite(sigma2)):
             return -1e10
 
-        ll_per_obs = self.dist.loglikelihood(adj_resids, sigma2)
+        dist_params = np.asarray(params, dtype=np.float64)[self.num_params :]
+        ll_per_obs = self.dist.loglikelihood(adj_resids, sigma2, dist_params)
         total = float(np.sum(ll_per_obs))
         return total if np.isfinite(total) else -1e10
 
@@ -184,7 +210,8 @@ class GARCHM(VolatilityModel):
         sigma2, adj_resids = self._garchm_joint_recursion(params, backcast)
         sigma2 = np.maximum(sigma2, 1e-12)
 
-        return self.dist.loglikelihood(adj_resids, sigma2)
+        dist_params = np.asarray(params, dtype=np.float64)[self.num_params :]
+        return self.dist.loglikelihood(adj_resids, sigma2, dist_params)
 
     def _one_step_variance(
         self, eps: float, sigma2_prev: float, params: NDArray[np.float64]
@@ -257,6 +284,30 @@ class GARCHM(VolatilityModel):
     def num_params(self) -> int:
         """Number of parameters: omega + q alphas + p betas + lambda."""
         return 1 + self.q + self.p + 1
+
+    # --- Simulation ---
+
+    def _simulate_mean_offset(
+        self,
+        var_params: NDArray[np.float64],
+        sigma2_t: float,
+    ) -> float:
+        """Risk premium ``lambda f(sigma^2_t)`` added to the simulated return.
+
+        Parameters
+        ----------
+        var_params : ndarray
+            Variance block ``[omega, alpha.., beta.., lambda]``.
+        sigma2_t : float
+            Conditional variance at date ``t``.
+
+        Returns
+        -------
+        float
+            The in-mean contribution to r_t.
+        """
+        _, _, _, lam = self._garchm_blocks(var_params)
+        return lam * self._risk_premium_function(sigma2_t)
 
     # --- Model-level moments and forecasts ---
 

@@ -3,9 +3,35 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
+
+
+def as_scalar_or_array(values: NDArray[np.float64], like: float | NDArray[np.float64]) -> Any:
+    """Shape a computed result like its input.
+
+    ``ppf`` and ``cdf`` accept either a scalar or an array; this returns a
+    Python ``float`` when the caller passed a scalar (or a 0-d array) and an
+    ``ndarray`` when the caller passed an array, so both call styles work.
+
+    Parameters
+    ----------
+    values : ndarray
+        Computed values (always an array internally).
+    like : float or ndarray
+        The original input.
+
+    Returns
+    -------
+    float or ndarray
+        ``values`` reshaped to match ``like``.
+    """
+    arr = np.asarray(values, dtype=np.float64)
+    if isinstance(like, np.ndarray) and like.ndim > 0:
+        return arr
+    return float(arr.reshape(-1)[0])
 
 
 class Distribution(ABC):
@@ -56,33 +82,34 @@ class Distribution(ABC):
         return constrained
 
     @abstractmethod
-    def ppf(self, q: float) -> float:
+    def ppf(self, q: float | NDArray[np.float64]) -> Any:
         """Percent point function (inverse CDF).
 
         Parameters
         ----------
-        q : float
-            Quantile in (0, 1).
+        q : float or ndarray
+            Quantile(s) in (0, 1).
 
         Returns
         -------
-        float
-            Value x such that P(Z <= x) = q.
+        float or ndarray
+            Value x such that P(Z <= x) = q; a float for scalar input, an
+            array (same shape) for array input.
         """
 
     @abstractmethod
-    def cdf(self, x: float) -> float:
+    def cdf(self, x: float | NDArray[np.float64]) -> Any:
         """Cumulative distribution function.
 
         Parameters
         ----------
-        x : float
-            Value.
+        x : float or ndarray
+            Value(s).
 
         Returns
         -------
-        float
-            P(Z <= x).
+        float or ndarray
+            P(Z <= x); a float for scalar input, an array for array input.
         """
 
     @abstractmethod

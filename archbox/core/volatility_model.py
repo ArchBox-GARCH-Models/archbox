@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 import numpy as np
 from numpy.typing import NDArray
@@ -12,6 +12,30 @@ from archbox.utils.validation import validate_positive_integer, validate_returns
 
 if TYPE_CHECKING:
     from archbox.distributions.base import Distribution
+
+
+class SimulationResult(NamedTuple):
+    """Output of :meth:`VolatilityModel.simulate`.
+
+    A plain 2-tuple ``(returns, variance)``, so ``r, s2 = model.simulate(...)``
+    and ``result[0]`` keep working; ``.volatility`` is offered as a convenience
+    for the square root.
+
+    Attributes
+    ----------
+    returns : ndarray
+        Simulated returns, shape (n,).
+    variance : ndarray
+        Simulated conditional variance sigma^2_t, shape (n,).
+    """
+
+    returns: NDArray[np.float64]
+    variance: NDArray[np.float64]
+
+    @property
+    def volatility(self) -> NDArray[np.float64]:
+        """Conditional volatility sigma_t (square root of ``variance``)."""
+        return np.sqrt(self.variance)
 
 
 class VolatilityModel(ABC):
@@ -44,11 +68,18 @@ class VolatilityModel(ABC):
 
     volatility_process: str = "Unknown"
 
+    #: Whether ``fit(variance_targeting=True)`` is supported. Targeting rebuilds
+    #: ``omega`` from ``var * (1 - persistence)``, which assumes the plain GARCH
+    #: layout ``[omega, alpha_1..q, beta_1..p]``; models with any other layout
+    #: must leave this ``False`` so the estimator raises instead of silently
+    #: reconstructing a meaningless ``omega``.
+    supports_variance_targeting: bool = False
+
     def __init__(
         self,
         endog: Any,
         mean: str = "constant",
-        dist: str = "normal",
+        dist: str | Distribution = "normal",
     ) -> None:
         """Initialize the volatility model with returns and options."""
         raw = validate_returns(endog)
@@ -65,18 +96,35 @@ class VolatilityModel(ABC):
             raise ValueError(msg)
 
         self.nobs = len(self.endog)
-        self._dist_name = dist
         self.dist: Distribution = self._build_distribution(dist)
+        self._dist_name = dist if isinstance(dist, str) else self.dist.name
         self._is_fitted = False
 
     @staticmethod
-    def _build_distribution(dist: str) -> Distribution:
-        """Build a distribution instance from a (possibly aliased) name."""
+    def _build_distribution(dist: str | Distribution) -> Distribution:
+        """Build a distribution instance from a name or an existing instance.
+
+        Parameters
+        ----------
+        dist : str or Distribution
+            Either a (possibly aliased) distribution name such as ``'studentt'``
+            or an already-constructed :class:`~archbox.distributions.base.Distribution`
+            (e.g. ``StudentT(nu=5.0)`` to fix the shape parameter).
+
+        Returns
+        -------
+        Distribution
+            The distribution instance to use for the likelihood.
+        """
+        from archbox.distributions.base import Distribution as _Distribution
         from archbox.distributions.ged import GeneralizedError
         from archbox.distributions.mixture_normal import MixtureNormal
         from archbox.distributions.normal import Normal
         from archbox.distributions.skewed_t import SkewedT
         from archbox.distributions.student_t import StudentT
+
+        if isinstance(dist, _Distribution):
+            return dist
 
         normalized = dist.strip().lower().replace("_", "-").replace(" ", "-")
 
@@ -521,52 +569,173 @@ class VolatilityModel(ABC):
         sigma2 = np.maximum(sigma2, 1e-12)
         return self.dist.loglikelihood(self.endog, sigma2, dist_params)
 
+    # --- Simulation hooks -------------------------------------------------
+    #
+    # ``simulate`` runs a single O(n) forward pass: at date ``t`` it asks the
+    # model for sigma^2_t given the shocks and variances already generated for
+    # dates < t.  Models whose recursion is not the plain GARCH(p, q) one
+    # override ``_simulate_next_variance`` (and, when the recursion carries
+    # extra state such as the Component-GARCH q_t/h_t split, ``_simulate_state``).
+
+    def _simulate_state(
+        self,
+        var_params: NDArray[np.float64],
+        backcast: float,
+    ) -> dict[str, Any]:
+        """Mutable state carried across simulation steps.
+
+        Parameters
+        ----------
+        var_params : ndarray
+            Variance block of the parameter vector.
+        backcast : float
+            Initial variance used for date 0 and for pre-sample lags.
+
+        Returns
+        -------
+        dict
+            Empty by default; models with hidden state override this.
+        """
+        del var_params, backcast
+        return {}
+
+    def _simulate_next_variance(
+        self,
+        var_params: NDArray[np.float64],
+        eps: NDArray[np.float64],
+        sigma2: NDArray[np.float64],
+        t: int,
+        backcast: float,
+        state: dict[str, Any],
+    ) -> float:
+        """One simulation step: sigma^2_t from the already-simulated history.
+
+        The default implements the GARCH(p, q) recursion
+        ``sigma^2_t = omega + sum_i alpha_i eps^2_{t-i} + sum_j beta_j sigma^2_{t-j}``
+        with pre-sample lags replaced by ``backcast``.
+
+        Parameters
+        ----------
+        var_params : ndarray
+            Variance block of the parameter vector.
+        eps : ndarray
+            Full shock array; entries ``0..t-1`` are filled.
+        sigma2 : ndarray
+            Full variance array; entries ``0..t-1`` are filled.
+        t : int
+            Current date (>= 1).
+        backcast : float
+            Pre-sample variance.
+        state : dict
+            Mutable per-model state (see ``_simulate_state``).
+
+        Returns
+        -------
+        float
+            sigma^2_t, strictly positive.
+        """
+        del state
+        omega, alphas, betas = self._arch_garch_blocks(var_params)
+        value = float(omega)
+        for i in range(len(alphas)):
+            lag = t - 1 - i
+            value += float(alphas[i]) * (float(eps[lag]) ** 2 if lag >= 0 else backcast)
+        for j in range(len(betas)):
+            lag = t - 1 - j
+            value += float(betas[j]) * (float(sigma2[lag]) if lag >= 0 else backcast)
+        return max(value, 1e-12)
+
+    def _simulate_mean_offset(
+        self,
+        var_params: NDArray[np.float64],
+        sigma2_t: float,
+    ) -> float:
+        """In-mean contribution added to the simulated return at date ``t``.
+
+        Zero for every model except GARCH-M, where the return carries the risk
+        premium ``lambda f(sigma^2_t)`` on top of the shock.
+
+        Parameters
+        ----------
+        var_params : ndarray
+            Variance block of the parameter vector.
+        sigma2_t : float
+            Conditional variance at date ``t``.
+
+        Returns
+        -------
+        float
+            Mean offset (0.0 by default).
+        """
+        del var_params, sigma2_t
+        return 0.0
+
     def simulate(
         self,
         n: int,
         params: NDArray[np.float64],
         seed: int | None = None,
-    ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
-        """Simulate returns and volatility from the model.
+    ) -> SimulationResult:
+        """Simulate returns and conditional variance from the model.
+
+        A single O(n) forward pass: ``sigma^2_t`` is built from the shocks and
+        variances simulated for earlier dates (see ``_simulate_next_variance``),
+        then ``eps_t = sigma_t z_t`` with ``z_t`` drawn from the model's own
+        conditional distribution using the shape parameters in ``params``
+        (Student-t, GED, skewed-t, ... - not always N(0, 1)).
+
+        Date 0 is initialised at the unconditional variance implied by
+        ``params`` when it exists, otherwise at the sample variance.
 
         Parameters
         ----------
         n : int
             Number of observations to simulate.
         params : ndarray
-            Model parameters.
+            Full parameter vector ``[variance block, distribution block]``.
+            A variance-only vector is also accepted.
         seed : int, optional
             Random seed.
 
         Returns
         -------
-        tuple[ndarray, ndarray]
-            (returns, conditional_volatility) each shape (n,).
+        SimulationResult
+            Named 2-tuple ``(returns, variance)``, each of shape (n,); the
+            variance is the sigma^2_t path that generated the returns
+            (``result.volatility`` gives sigma_t).
         """
+        n_obs = validate_positive_integer(n, "n")
         rng = np.random.default_rng(seed)
+
+        all_params = np.asarray(params, dtype=np.float64).ravel()
         nv = self.num_params
-        var_params = params[:nv]
-        dist_params = params[nv:]
-        z = self.dist.simulate(n, rng, dist_params)
+        var_params = all_params[:nv]
+        dist_block = all_params[nv:]
+        shape_params = dist_block if dist_block.size else None
+        z = self._simulate_innovations(n_obs, rng, shape_params)
 
-        backcast = var_params[0] / (1.0 - np.sum(var_params[1:]))  # unconditional variance
-        if not np.isfinite(backcast) or backcast <= 0:
-            backcast = np.var(self.endog) if len(self.endog) > 0 else 1.0
+        backcast = self.unconditional_variance(var_params, shape_params)
+        if not np.isfinite(backcast) or backcast <= 0.0:
+            backcast = float(np.var(self.endog)) if self.nobs > 0 else 1.0
+        if not np.isfinite(backcast) or backcast <= 0.0:
+            backcast = 1.0
 
-        sigma2 = np.empty(n)
-        returns = np.empty(n)
+        sigma2 = np.empty(n_obs, dtype=np.float64)
+        eps = np.empty(n_obs, dtype=np.float64)
+        returns = np.empty(n_obs, dtype=np.float64)
+        state = self._simulate_state(var_params, backcast)
 
-        # First observation
-        sigma2[0] = backcast
-        returns[0] = np.sqrt(sigma2[0]) * z[0]
+        for t in range(n_obs):
+            if t == 0:
+                sigma2[0] = backcast
+            else:
+                sigma2[t] = self._simulate_next_variance(
+                    var_params, eps, sigma2, t, backcast, state
+                )
+            eps[t] = np.sqrt(max(float(sigma2[t]), 1e-12)) * z[t]
+            returns[t] = eps[t] + self._simulate_mean_offset(var_params, float(sigma2[t]))
 
-        for t in range(1, n):
-            sigma2[t : t + 1] = self._variance_recursion(var_params, returns[:t], float(backcast))[
-                -1:
-            ]
-            returns[t] = np.sqrt(max(sigma2[t], 1e-12)) * z[t]
-
-        return returns, np.sqrt(sigma2)
+        return SimulationResult(returns, sigma2)
 
     def _backcast(self, resids: NDArray[np.float64]) -> float:
         """Compute backcast value for variance initialization.

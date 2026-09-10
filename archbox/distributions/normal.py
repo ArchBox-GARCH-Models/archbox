@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 from numpy.typing import NDArray
 from scipy import stats
 
-from archbox.distributions.base import Distribution
+from archbox.distributions.base import Distribution, as_scalar_or_array
 
 _LOG_2PI = np.log(2.0 * np.pi)
 
@@ -46,35 +48,35 @@ class Normal(Distribution):
         """
         return -0.5 * (_LOG_2PI + np.log(sigma2) + resids**2 / sigma2)
 
-    def ppf(self, q: float) -> float:
+    def ppf(self, q: float | NDArray[np.float64]) -> Any:
         """Normal percent point function.
 
         Parameters
         ----------
-        q : float
-            Quantile in (0, 1).
+        q : float or ndarray
+            Quantile(s) in (0, 1).
 
         Returns
         -------
-        float
+        float or ndarray
             Value x such that Phi(x) = q.
         """
-        return float(stats.norm.ppf(q))
+        return as_scalar_or_array(np.asarray(stats.norm.ppf(q), dtype=np.float64), q)
 
-    def cdf(self, x: float) -> float:
+    def cdf(self, x: float | NDArray[np.float64]) -> Any:
         """Normal CDF.
 
         Parameters
         ----------
-        x : float
-            Value.
+        x : float or ndarray
+            Value(s).
 
         Returns
         -------
-        float
+        float or ndarray
             Phi(x).
         """
-        return float(stats.norm.cdf(x))
+        return as_scalar_or_array(np.asarray(stats.norm.cdf(x), dtype=np.float64), x)
 
     def simulate(
         self,

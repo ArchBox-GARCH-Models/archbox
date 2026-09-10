@@ -5,12 +5,14 @@ f(z; nu) = Gamma((nu+1)/2) / (sqrt(pi*(nu-2)) * Gamma(nu/2)) * (1 + z^2/(nu-2))^
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 from numpy.typing import NDArray
 from scipy import stats
 from scipy.special import gammaln
 
-from archbox.distributions.base import Distribution
+from archbox.distributions.base import Distribution, as_scalar_or_array
 
 
 class StudentT(Distribution):
@@ -23,6 +25,12 @@ class StudentT(Distribution):
     """
 
     name = "Student-t"
+
+    #: Bounds of the shape parameter. ``transform_params`` maps the whole real
+    #: line onto this open interval and ``_get_nu`` clamps to it, so the
+    #: declared ``bounds()``, the transform and the likelihood always agree.
+    NU_MIN: float = 2.01
+    NU_MAX: float = 100.0
 
     def __init__(self, nu: float | None = None) -> None:
         """Initialize Student-t distribution with optional degrees of freedom."""
@@ -45,14 +53,19 @@ class StudentT(Distribution):
         return np.array([8.0])
 
     def _get_nu(self, dist_params: NDArray[np.float64] | None = None) -> float:
-        """Extract nu from dist_params or fixed value."""
+        """Extract nu from ``dist_params`` or the fixed value.
+
+        An *estimated* nu is clamped to the declared ``bounds()`` (the same
+        interval ``transform_params`` maps onto, so the clamp never bites at the
+        optimum). A nu fixed by the user is only clamped to the validity domain
+        ``nu > 2``: pinning ``nu = 200`` is a legitimate choice, not an
+        optimizer excursion.
+        """
         if self._fixed_nu is not None:
-            nu = self._fixed_nu
-        elif dist_params is not None and len(dist_params) > 0:
-            nu = float(dist_params[0])
-        else:
-            nu = 8.0
-        return max(nu, 2.01)
+            return max(float(self._fixed_nu), self.NU_MIN)
+        has_params = dist_params is not None and len(dist_params) > 0
+        nu = float(dist_params[0]) if has_params and dist_params is not None else 8.0
+        return float(np.clip(nu, self.NU_MIN, self.NU_MAX))
 
     def loglikelihood(
         self,
@@ -88,38 +101,40 @@ class StudentT(Distribution):
         )
         return ll
 
-    def ppf(self, q: float) -> float:
+    def ppf(self, q: float | NDArray[np.float64]) -> Any:
         """Percent point function for standardized Student-t.
 
         Parameters
         ----------
-        q : float
-            Quantile in (0, 1).
+        q : float or ndarray
+            Quantile(s) in (0, 1).
 
         Returns
         -------
-        float
+        float or ndarray
             Value x such that P(Z <= x) = q.
         """
         nu = self._get_nu()
         # Standardize: t(nu) has variance nu/(nu-2)
-        return float(stats.t.ppf(q, df=nu) / np.sqrt(nu / (nu - 2)))
+        values = np.asarray(stats.t.ppf(q, df=nu), dtype=np.float64) / np.sqrt(nu / (nu - 2))
+        return as_scalar_or_array(values, q)
 
-    def cdf(self, x: float) -> float:
+    def cdf(self, x: float | NDArray[np.float64]) -> Any:
         """CDF for standardized Student-t.
 
         Parameters
         ----------
-        x : float
-            Value.
+        x : float or ndarray
+            Value(s).
 
         Returns
         -------
-        float
+        float or ndarray
             P(Z <= x).
         """
         nu = self._get_nu()
-        return float(stats.t.cdf(x * np.sqrt(nu / (nu - 2)), df=nu))
+        scaled = np.asarray(x, dtype=np.float64) * np.sqrt(nu / (nu - 2))
+        return as_scalar_or_array(np.asarray(stats.t.cdf(scaled, df=nu), dtype=np.float64), x)
 
     def simulate(
         self,
@@ -149,23 +164,33 @@ class StudentT(Distribution):
         return z
 
     def transform_params(self, unconstrained: NDArray[np.float64]) -> NDArray[np.float64]:
-        """Transform: nu = 2 + exp(x) ensures nu > 2."""
+        """Transform x -> nu in the open interval ``(NU_MIN, NU_MAX)``.
+
+        The scaled logistic keeps the optimum interior to the declared
+        ``bounds()``, so the clamp in ``_get_nu`` never truncates the value the
+        optimizer is actually exploring.
+        """
         if len(unconstrained) == 0:
             return unconstrained
         constrained = unconstrained.copy()
-        constrained[0] = 2.0 + np.exp(unconstrained[0])
+        span = self.NU_MAX - self.NU_MIN
+        weight = 1.0 / (1.0 + np.exp(-np.clip(unconstrained[0], -50.0, 50.0)))
+        constrained[0] = self.NU_MIN + span * weight
         return constrained
 
     def untransform_params(self, constrained: NDArray[np.float64]) -> NDArray[np.float64]:
-        """Inverse transform: x = log(nu - 2)."""
+        """Inverse of :meth:`transform_params` (logit of the rescaled nu)."""
         if len(constrained) == 0:
             return constrained
         unconstrained = constrained.copy()
-        unconstrained[0] = np.log(max(constrained[0] - 2.0, 1e-6))
+        span = self.NU_MAX - self.NU_MIN
+        weight = (float(constrained[0]) - self.NU_MIN) / span
+        weight = float(np.clip(weight, 1e-8, 1.0 - 1e-8))
+        unconstrained[0] = np.log(weight / (1.0 - weight))
         return unconstrained
 
     def bounds(self) -> list[tuple[float, float]]:
         """Parameter bounds."""
         if self._fixed_nu is not None:
             return []
-        return [(2.01, 100.0)]
+        return [(self.NU_MIN, self.NU_MAX)]

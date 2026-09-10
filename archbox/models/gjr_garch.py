@@ -196,6 +196,38 @@ class GJRGARCH(VolatilityModel):
         """Number of model parameters."""
         return 1 + 2 * self.q + self.p
 
+    # --- Simulation ---
+
+    def _simulate_next_variance(
+        self,
+        var_params: NDArray[np.float64],
+        eps: NDArray[np.float64],
+        sigma2: NDArray[np.float64],
+        t: int,
+        backcast: float,
+        state: dict[str, Any],
+    ) -> float:
+        """One GJR-GARCH simulation step (same recursion as ``_variance_recursion``).
+
+        Pre-sample shocks contribute ``(alpha_i + gamma_i / 2) * backcast``, the
+        expectation of the leverage term under symmetric innovations.
+        """
+        del state
+        omega, alphas, gammas, betas = self._gjr_blocks(var_params)
+        value = float(omega)
+        for i in range(self.q):
+            lag = t - 1 - i
+            if lag >= 0:
+                e = float(eps[lag])
+                indicator = 1.0 if e < 0.0 else 0.0
+                value += (float(alphas[i]) + float(gammas[i]) * indicator) * e**2
+            else:
+                value += (float(alphas[i]) + 0.5 * float(gammas[i])) * backcast
+        for j in range(self.p):
+            lag = t - 1 - j
+            value += float(betas[j]) * (float(sigma2[lag]) if lag >= 0 else backcast)
+        return max(value, 1e-12)
+
     # --- Model-level moments and forecasts ---
 
     def _gjr_blocks(

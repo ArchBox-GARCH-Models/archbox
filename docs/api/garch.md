@@ -90,7 +90,7 @@ fc = result.forecast(horizon=10)
 print(fc['volatility'])
 
 # Simulacao
-sim_ret, sim_vol = model.simulate(n=500, params=result.params, seed=42)
+sim_ret, sim_var = model.simulate(n=500, params=result.params, seed=42)
 ```
 
 ---

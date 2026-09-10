@@ -89,15 +89,21 @@ def egarch_recursion_numba(
     resids: NDArray[np.float64],
     log_sigma2: NDArray[np.float64],
     omega: float,
-    alpha: float,
-    gamma: float,
-    beta: float,
-    backcast: float,
+    alphas: NDArray[np.float64],
+    gammas: NDArray[np.float64],
+    betas: NDArray[np.float64],
+    p: int,
+    q: int,
+    log_backcast: float,
 ) -> NDArray[np.float64]:
-    """EGARCH recursion in log-space.
+    """EGARCH(p, q) recursion in log-space.
 
-    Computes: log(sigma2_t) = omega + alpha*(|z_{t-1}| - E|z|) + gamma*z_{t-1}
-              + beta*log(sigma2_{t-1})
+    Computes, for every t (pre-sample log-variances are ``log_backcast`` and
+    pre-sample standardized shocks are 0)::
+
+        log(sigma2_t) = omega
+                        + sum_j beta_j  log(sigma2_{t-j})
+                        + sum_i [alpha_i (|z_{t-i}| - E|z|) + gamma_i z_{t-i}]
 
     Parameters
     ----------
@@ -107,14 +113,18 @@ def egarch_recursion_numba(
         Output log-variance array, shape (T,).
     omega : float
         Constant term.
-    alpha : float
-        ARCH coefficient.
-    gamma : float
-        Leverage coefficient.
-    beta : float
-        GARCH coefficient.
-    backcast : float
-        Initial log-variance value.
+    alphas : ndarray
+        ARCH coefficients, shape (q,).
+    gammas : ndarray
+        Leverage coefficients, shape (q,).
+    betas : ndarray
+        GARCH coefficients, shape (p,).
+    p : int
+        Number of lagged log-variance terms.
+    q : int
+        Number of lagged shock terms.
+    log_backcast : float
+        Initial (pre-sample) log-variance value.
 
     Returns
     -------
@@ -123,12 +133,25 @@ def egarch_recursion_numba(
     """
     nobs = len(resids)
     e_abs_z = np.sqrt(2.0 / np.pi)  # E[|z|] for standard normal
-    log_sigma2[0] = backcast
 
-    for t in range(1, nobs):
-        sigma_prev = np.exp(log_sigma2[t - 1] / 2.0)
-        z = resids[t - 1] / max(sigma_prev, 1e-12)
-        log_sigma2[t] = omega + alpha * (np.abs(z) - e_abs_z) + gamma * z + beta * log_sigma2[t - 1]
+    for t in range(nobs):
+        value = omega
+        for j in range(p):
+            lag = t - 1 - j
+            if lag >= 0:
+                value += betas[j] * log_sigma2[lag]
+            else:
+                value += betas[j] * log_backcast
+        for i in range(q):
+            lag = t - 1 - i
+            if lag >= 0:
+                prev_sigma = np.sqrt(np.exp(log_sigma2[lag]))
+                z = resids[lag] / max(prev_sigma, 1e-6)
+            else:
+                z = 0.0
+            value += alphas[i] * (np.abs(z) - e_abs_z)
+            value += gammas[i] * z
+        log_sigma2[t] = value
     return log_sigma2
 
 
@@ -287,17 +310,37 @@ def egarch_recursion_python(
     resids: NDArray[np.float64],
     log_sigma2: NDArray[np.float64],
     omega: float,
-    alpha: float,
-    gamma: float,
-    beta: float,
-    backcast: float,
+    alphas: NDArray[np.float64],
+    gammas: NDArray[np.float64],
+    betas: NDArray[np.float64],
+    p: int,
+    q: int,
+    log_backcast: float,
 ) -> NDArray[np.float64]:
-    """Pure Python EGARCH recursion (fallback)."""
+    """Pure Python EGARCH(p, q) recursion (fallback).
+
+    Mirrors :func:`egarch_recursion_numba` operation for operation, so both
+    backends return identical values.
+    """
     nobs = len(resids)
     e_abs_z = np.sqrt(2.0 / np.pi)
-    log_sigma2[0] = backcast
-    for t in range(1, nobs):
-        sigma_prev = np.exp(log_sigma2[t - 1] / 2.0)
-        z = resids[t - 1] / max(sigma_prev, 1e-12)
-        log_sigma2[t] = omega + alpha * (np.abs(z) - e_abs_z) + gamma * z + beta * log_sigma2[t - 1]
+
+    for t in range(nobs):
+        value = omega
+        for j in range(p):
+            lag = t - 1 - j
+            if lag >= 0:
+                value += betas[j] * log_sigma2[lag]
+            else:
+                value += betas[j] * log_backcast
+        for i in range(q):
+            lag = t - 1 - i
+            if lag >= 0:
+                prev_sigma = np.sqrt(np.exp(log_sigma2[lag]))
+                z = resids[lag] / max(prev_sigma, 1e-6)
+            else:
+                z = 0.0
+            value += alphas[i] * (np.abs(z) - e_abs_z)
+            value += gammas[i] * z
+        log_sigma2[t] = value
     return log_sigma2
