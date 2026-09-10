@@ -7,12 +7,19 @@ Where R is constant, estimated as sample correlation of standardized residuals.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
 
-from archbox.multivariate.base import MultivariateVolatilityModel, MultivarResults
+from archbox.multivariate.base import MultivariateVolatilityModel
+from archbox.multivariate.results import MultivarResults
+from archbox.multivariate.utils import (
+    corr_to_cov,
+    cov_to_corr,
+    ensure_positive_definite,
+)
 
 
 class CCC(MultivariateVolatilityModel):
@@ -24,12 +31,14 @@ class CCC(MultivariateVolatilityModel):
 
     Parameters
     ----------
-    endog : ndarray
-        Array of shape (T, k) with k return series.
-    univariate_model : str
-        Univariate GARCH variant. Default 'GARCH'.
+    endog : array-like
+        Array or DataFrame of shape (T, k) with k return series.
+    univariate_model : str or type or callable
+        Univariate volatility model for each series. Default 'GARCH'.
     univariate_order : tuple[int, int]
-        (p, q) order for univariate GARCH. Default (1, 1).
+        (p, q) order for the univariate model. Default (1, 1).
+    univariate_dist : str
+        Conditional distribution of the univariate models. Default 'normal'.
 
     Examples
     --------
@@ -51,11 +60,12 @@ class CCC(MultivariateVolatilityModel):
     def __init__(
         self,
         endog: Any,
-        univariate_model: str = "GARCH",
+        univariate_model: str | type | Callable[..., Any] = "GARCH",
         univariate_order: tuple[int, int] = (1, 1),
+        univariate_dist: str = "normal",
     ) -> None:
         """Initialize CCC-GARCH model with options."""
-        super().__init__(endog, univariate_model, univariate_order)
+        super().__init__(endog, univariate_model, univariate_order, univariate_dist)
         self._R: NDArray[np.float64] | None = None
 
     def _correlation_recursion(
@@ -83,25 +93,16 @@ class CCC(MultivariateVolatilityModel):
         """
         n_obs, k = std_resids.shape
 
-        # Compute sample correlation of standardized residuals
         corr = np.asarray(np.corrcoef(std_resids.T), dtype=np.float64)  # (k, k)
 
         # Ensure positive definite
         eigenvalues = np.linalg.eigvalsh(corr)
         if np.any(eigenvalues <= 0):
-            from archbox.multivariate.utils import ensure_positive_definite
-
-            corr = ensure_positive_definite(corr)
-            # Re-normalize to correlation
-            d = np.sqrt(np.diag(corr))
-            corr = corr / np.outer(d, d)
+            corr = cov_to_corr(ensure_positive_definite(corr))
 
         self._R = corr
 
-        # Broadcast to all time periods
-        corr_t = np.broadcast_to(corr, (n_obs, k, k)).copy()
-
-        return corr_t
+        return np.broadcast_to(corr, (n_obs, k, k)).copy()
 
     @property
     def start_params(self) -> NDArray[np.float64]:
@@ -117,62 +118,13 @@ class CCC(MultivariateVolatilityModel):
         """No bounds for CCC (no parameters)."""
         return []
 
-    def fit(  # noqa: ARG002
+    def _results_extras(
         self,
-        method: str = "two_step",
-        disp: bool = True,
-    ) -> MultivarResults:
-        """Fit the CCC-GARCH model.
-
-        Parameters
-        ----------
-        method : str
-            Estimation method. Only 'two_step' supported.
-        disp : bool
-            Display progress.
-
-        Returns
-        -------
-        MultivarResults
-            Fitted model results.
-        """
-        # Step 1: fit univariate GARCH models
-        self._fit_univariate()
-        assert self._std_resids is not None
-        assert self._conditional_volatility is not None
-        assert self._univariate_results is not None
-
-        # Step 2: compute constant correlation (no optimization needed)
-        params = self.start_params
-        corr_t = self._correlation_recursion(params, self._std_resids)
-        cov_t = self._compute_covariance(corr_t, self._conditional_volatility)
-
-        # Compute log-likelihood
-        loglike = self._loglikelihood(corr_t, self._std_resids, self._conditional_volatility)
-
-        # Count parameters
-        n_univ_params = sum(len(r.params) for r in self._univariate_results)
-        n_total = n_univ_params  # CCC has no correlation parameters
-
-        aic = -2.0 * loglike + 2.0 * n_total
-        bic = -2.0 * loglike + np.log(self.T) * n_total
-
-        self._is_fitted = True
-
-        return MultivarResults(
-            model=self,
-            univariate_results=self._univariate_results,
-            params=params,
-            dynamic_correlation=corr_t,
-            dynamic_covariance=cov_t,
-            conditional_volatility=self._conditional_volatility,
-            std_resids=self._std_resids,
-            loglike=loglike,
-            aic=aic,
-            bic=bic,
-            n_obs=self.T,
-            n_series=self.k,
-        )
+        params: NDArray[np.float64],
+        std_resids: NDArray[np.float64],
+    ) -> dict[str, Any]:
+        """Store the estimated constant correlation on the results object."""
+        return {"constant_correlation": self._correlation_recursion(params, std_resids)[0]}
 
     @property
     def constant_correlation(self) -> NDArray[np.float64] | None:
@@ -186,8 +138,8 @@ class CCC(MultivariateVolatilityModel):
     ) -> dict[str, NDArray[np.float64]]:
         """Forecast H_{T+h} for CCC.
 
-        For CCC, the correlation forecast is simply R (constant).
-        The covariance forecast uses univariate GARCH variance forecasts.
+        The correlation forecast is the constant R; the variance forecasts come
+        from each univariate ``ArchResults.forecast(horizon)``.
 
         Parameters
         ----------
@@ -201,15 +153,16 @@ class CCC(MultivariateVolatilityModel):
         dict
             Dictionary with 'covariance' and 'correlation' forecasts.
         """
-        assert self._R is not None
+        if horizon < 1:
+            msg = f"horizon must be >= 1, got {horizon}"
+            raise ValueError(msg)
 
-        corr_forecast = np.zeros((horizon, self.k, self.k))
-        cov_forecast = np.zeros((horizon, self.k, self.k))
-
-        for h in range(horizon):
-            corr_forecast[h] = self._R
-            # Use last conditional volatility as naive forecast
-            d_mat = np.diag(results.conditional_volatility[-1])
-            cov_forecast[h] = d_mat @ self._R @ d_mat
+        corr = np.asarray(
+            results.extras.get("constant_correlation", results.dynamic_correlation[-1]),
+            dtype=np.float64,
+        )
+        corr_forecast = np.tile(corr, (horizon, 1, 1))
+        vol = self._univariate_volatility_forecast(results, horizon)
+        cov_forecast = corr_to_cov(corr_forecast, vol)
 
         return {"covariance": cov_forecast, "correlation": corr_forecast}

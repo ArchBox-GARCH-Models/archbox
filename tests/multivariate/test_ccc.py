@@ -157,3 +157,47 @@ class TestCCCGARCH:
         assert results.dynamic_correlation.shape == (2000, 3, 3)
         assert results.dynamic_covariance.shape == (2000, 3, 3)
         assert np.isfinite(results.loglike)
+
+
+class TestCCCForecast:
+    """CCC forecasts must use the univariate variance forecasts."""
+
+    def test_forecast_uses_univariate_variance_forecast(self, synthetic_returns):
+        """Diagonal of the covariance forecast equals ArchResults.forecast."""
+        model = CCC(synthetic_returns)
+        results = model.fit(disp=False)
+
+        horizon = 8
+        fcast = model.forecast(results, horizon=horizon)
+        diag = np.diagonal(fcast["covariance"], axis1=1, axis2=2)
+        for i, res in enumerate(results.univariate_results):
+            np.testing.assert_allclose(
+                diag[:, i], res.forecast(horizon=horizon)["variance"], rtol=1e-10
+            )
+
+    def test_forecast_is_not_the_last_sigma_repeated(self, fx_returns):
+        """The old implementation held sigma_T constant across the horizon."""
+        model = CCC(fx_returns)
+        results = model.fit(disp=False)
+
+        fcast = model.forecast(results, horizon=30)
+        diag = np.diagonal(fcast["covariance"], axis1=1, axis2=2)
+        last = results.conditional_volatility[-1] ** 2
+        assert not np.allclose(diag[-1], last, rtol=1e-6)
+
+    def test_forecast_rejects_zero_horizon(self, synthetic_returns):
+        """horizon < 1 raises instead of returning empty arrays."""
+        import pytest
+
+        model = CCC(synthetic_returns)
+        results = model.fit(disp=False)
+        with pytest.raises(ValueError, match="horizon"):
+            model.forecast(results, horizon=0)
+
+    def test_constant_correlation_stored_on_results(self, synthetic_returns):
+        """R is on the results object, not read back from model state."""
+        model = CCC(synthetic_returns)
+        results = model.fit(disp=False)
+        np.testing.assert_allclose(
+            results.extras["constant_correlation"], results.dynamic_correlation[0]
+        )

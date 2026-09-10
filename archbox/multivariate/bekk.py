@@ -7,14 +7,21 @@ Guarantees positive definite H_t by construction.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
-from scipy import optimize
 
-from archbox.multivariate.base import MultivariateVolatilityModel, MultivarResults
-from archbox.multivariate.utils import is_positive_definite
+from archbox.core.exceptions import ConvergenceError
+from archbox.multivariate.base import PENALTY, MultivariateVolatilityModel
+from archbox.multivariate.results import MultivarResults
+from archbox.multivariate.utils import (
+    cov_to_corr,
+    is_positive_definite,
+    numerical_hessian,
+    standard_errors_from_hessian,
+)
 
 
 class BEKK(MultivariateVolatilityModel):
@@ -25,14 +32,16 @@ class BEKK(MultivariateVolatilityModel):
 
     Parameters
     ----------
-    endog : ndarray
-        Array of shape (T, k) with k return series.
+    endog : array-like
+        Array or DataFrame of shape (T, k) with k return series.
     variant : str
         'full' for full BEKK, 'diagonal' for diagonal BEKK. Default 'diagonal'.
-    univariate_model : str
+    univariate_model : str or type or callable
         Not used directly (BEKK uses full MLE). Default 'GARCH'.
     univariate_order : tuple[int, int]
         Not used directly. Default (1, 1).
+    univariate_dist : str
+        Not used directly. Default 'normal'.
 
     Examples
     --------
@@ -50,21 +59,26 @@ class BEKK(MultivariateVolatilityModel):
     """
 
     model_name: str = "BEKK-GARCH"
+    supported_methods: tuple[str, ...] = ("mle",)
 
     def __init__(
         self,
         endog: Any,
         variant: str = "diagonal",
-        univariate_model: str = "GARCH",
+        univariate_model: str | type | Callable[..., Any] = "GARCH",
         univariate_order: tuple[int, int] = (1, 1),
+        univariate_dist: str = "normal",
     ) -> None:
         """Initialize BEKK-GARCH model with variant and options."""
-        super().__init__(endog, univariate_model, univariate_order)
+        super().__init__(endog, univariate_model, univariate_order, univariate_dist)
         if variant not in ("full", "diagonal"):
             msg = f"variant must be 'full' or 'diagonal', got '{variant}'"
             raise ValueError(msg)
         self.variant = variant
         self.model_name = f"BEKK-GARCH ({variant})"
+        self._mu: NDArray[np.float64] | None = None
+
+    # --- Parameter bookkeeping ---
 
     @property
     def _n_c_params(self) -> int:
@@ -87,8 +101,13 @@ class BEKK(MultivariateVolatilityModel):
 
     @property
     def num_params(self) -> int:
-        """Total number of model parameters."""
+        """Total number of covariance parameters (C, A and B; excludes the mean)."""
         return self._n_c_params + self._n_a_params + self._n_b_params
+
+    @property
+    def num_mean_params(self) -> int:
+        """Number of mean parameters estimated by demeaning the returns."""
+        return self.k
 
     def _unpack_params(
         self, params: NDArray[np.float64]
@@ -108,27 +127,20 @@ class BEKK(MultivariateVolatilityModel):
         k = self.k
         idx = 0
 
-        # c_mat: lower triangular
         c_mat = np.zeros((k, k))
-        for i in range(k):
-            for j in range(i + 1):
-                c_mat[i, j] = params[idx]
-                idx += 1
+        rows, cols = np.tril_indices(k)
+        c_mat[rows, cols] = params[idx : idx + self._n_c_params]
+        idx += self._n_c_params
 
-        # a_mat
         if self.variant == "diagonal":
-            a_mat = np.diag(params[idx : idx + k])
+            a_mat = np.diag(np.asarray(params[idx : idx + k], dtype=np.float64))
+            idx += k
+            b_mat = np.diag(np.asarray(params[idx : idx + k], dtype=np.float64))
             idx += k
         else:
-            a_mat = params[idx : idx + k * k].reshape(k, k)
+            a_mat = np.asarray(params[idx : idx + k * k], dtype=np.float64).reshape(k, k)
             idx += k * k
-
-        # b_mat
-        if self.variant == "diagonal":
-            b_mat = np.diag(params[idx : idx + k])
-            idx += k
-        else:
-            b_mat = params[idx : idx + k * k].reshape(k, k)
+            b_mat = np.asarray(params[idx : idx + k * k], dtype=np.float64).reshape(k, k)
             idx += k * k
 
         return c_mat, a_mat, b_mat
@@ -139,7 +151,7 @@ class BEKK(MultivariateVolatilityModel):
         a_mat: NDArray[np.float64],
         b_mat: NDArray[np.float64],
     ) -> NDArray[np.float64]:
-        """Pack C, A, B matrices into flat parameter vector.
+        """Pack C, A, B matrices into a flat parameter vector.
 
         Parameters
         ----------
@@ -156,26 +168,33 @@ class BEKK(MultivariateVolatilityModel):
             Flat parameter vector.
         """
         k = self.k
-        params_list: list[float] = []
+        rows, cols = np.tril_indices(k)
+        parts: list[NDArray[np.float64]] = [c_mat[rows, cols]]
+        if self.variant == "diagonal":
+            parts.append(np.diag(a_mat))
+            parts.append(np.diag(b_mat))
+        else:
+            parts.append(a_mat.ravel())
+            parts.append(b_mat.ravel())
+        return np.concatenate(parts).astype(np.float64)
 
-        # c_mat: lower triangular elements
+    @property
+    def param_names(self) -> list[str]:
+        """Parameter names."""
+        k = self.k
+        names: list[str] = []
         for i in range(k):
             for j in range(i + 1):
-                params_list.append(c_mat[i, j])
-
-        # a_mat
+                names.append(f"C[{i},{j}]")
         if self.variant == "diagonal":
-            params_list.extend(np.diag(a_mat).tolist())
+            names.extend(f"A[{i},{i}]" for i in range(k))
+            names.extend(f"B[{i},{i}]" for i in range(k))
         else:
-            params_list.extend(a_mat.ravel().tolist())
+            names.extend(f"A[{i},{j}]" for i in range(k) for j in range(k))
+            names.extend(f"B[{i},{j}]" for i in range(k) for j in range(k))
+        return names
 
-        # b_mat
-        if self.variant == "diagonal":
-            params_list.extend(np.diag(b_mat).tolist())
-        else:
-            params_list.extend(b_mat.ravel().tolist())
-
-        return np.array(params_list, dtype=np.float64)
+    # --- Recursion / likelihood ---
 
     def _bekk_recursion(
         self,
@@ -184,10 +203,9 @@ class BEKK(MultivariateVolatilityModel):
         b_mat: NDArray[np.float64],
         resids: NDArray[np.float64],
     ) -> NDArray[np.float64]:
-        """Compute BEKK covariance recursion.
+        """Compute the BEKK covariance recursion.
 
-        h_t = c_mat @ c_mat' + a_mat' @ eps_{t-1} @ eps'_{t-1} @ a_mat
-              + b_mat' @ h_{t-1} @ b_mat
+        h_t = C C' + A' eps_{t-1} eps'_{t-1} A + B' h_{t-1} B
 
         Parameters
         ----------
@@ -206,32 +224,170 @@ class BEKK(MultivariateVolatilityModel):
             Conditional covariance matrices (T, k, k).
         """
         n_obs, k = resids.shape
-        h_t = np.zeros((n_obs, k, k))
+        h_t = np.empty((n_obs, k, k))
         cc = c_mat @ c_mat.T
 
-        # Initialize h_0 with sample covariance
-        h_t[0] = np.cov(resids.T)
-        if not is_positive_definite(h_t[0]):
-            h_t[0] = cc + np.eye(k) * 1e-6
+        h_0 = np.cov(resids.T)
+        if not is_positive_definite(h_0):
+            h_0 = cc + np.eye(k) * 1e-6
+        h_t[0] = h_0
 
+        outer = resids[:, :, None] * resids[:, None, :]
+        h_prev = h_0
         for t in range(1, n_obs):
-            eps = resids[t - 1 : t].T  # (k, 1)
-            h_t[t] = cc + a_mat.T @ (eps @ eps.T) @ a_mat + b_mat.T @ h_t[t - 1] @ b_mat
-
-            # Ensure symmetry
-            h_t[t] = (h_t[t] + h_t[t].T) / 2.0
+            h_prev = cc + a_mat.T @ outer[t - 1] @ a_mat + b_mat.T @ h_prev @ b_mat
+            h_prev = 0.5 * (h_prev + h_prev.T)
+            h_t[t] = h_prev
 
         return h_t
 
-    def _correlation_recursion(
+    @staticmethod
+    def _gaussian_loglike(
+        h_t: NDArray[np.float64],
+        resids: NDArray[np.float64],
+    ) -> float:
+        """Full Gaussian log-likelihood of ``resids`` under the H_t path.
+
+        Parameters
+        ----------
+        h_t : ndarray
+            Conditional covariance matrices (T, k, k).
+        resids : ndarray
+            Residuals (T, k).
+
+        Returns
+        -------
+        float
+            Log-likelihood, or ``-inf`` when some H_t is not positive definite.
+        """
+        n_obs, k = resids.shape
+        if not np.all(np.isfinite(h_t)):
+            return -np.inf
+        sign, logdet = np.linalg.slogdet(h_t)
+        if np.any(sign <= 0.0) or not np.all(np.isfinite(logdet)):
+            return -np.inf
+        try:
+            solved = np.linalg.solve(h_t, resids[:, :, None])[:, :, 0]
+        except np.linalg.LinAlgError:
+            return -np.inf
+        quad = np.einsum("tk,tk->t", resids, solved)
+        total = float(np.sum(logdet + quad)) + n_obs * k * np.log(2.0 * np.pi)
+        if not np.isfinite(total):
+            return -np.inf
+        return -0.5 * total
+
+    def _neg_loglike(
         self,
         params: NDArray[np.float64],
+        resids: NDArray[np.float64],
+    ) -> float:
+        """Negative BEKK log-likelihood, ``inf`` when the parameters are infeasible."""
+        c_mat, a_mat, b_mat = self._unpack_params(np.asarray(params, dtype=np.float64))
+        if self.stationarity_measure(a_mat, b_mat) >= 1.0:
+            return float(np.inf)
+        with np.errstate(over="ignore", invalid="ignore"):
+            h_t = self._bekk_recursion(c_mat, a_mat, b_mat, resids)
+            ll = self._gaussian_loglike(h_t, resids)
+        if not np.isfinite(ll):
+            return float(np.inf)
+        return -ll
+
+    # --- Constraints ---
+
+    @staticmethod
+    def stationarity_measure(
+        a_mat: NDArray[np.float64],
+        b_mat: NDArray[np.float64],
+    ) -> float:
+        """Spectral radius of (A' kron A') + (B' kron B').
+
+        The BEKK covariance process is covariance stationary iff this value is
+        strictly below 1 (Engle & Kroner, 1995, Prop. 2.7).
+
+        Parameters
+        ----------
+        a_mat : ndarray
+            ARCH parameter matrix (k, k).
+        b_mat : ndarray
+            GARCH parameter matrix (k, k).
+
+        Returns
+        -------
+        float
+            Spectral radius, or ``inf`` if it cannot be computed.
+        """
+        companion = np.kron(a_mat.T, a_mat.T) + np.kron(b_mat.T, b_mat.T)
+        if not np.all(np.isfinite(companion)):
+            return float(np.inf)
+        try:
+            eigvals = np.linalg.eigvals(companion)
+        except np.linalg.LinAlgError:  # pragma: no cover - defensive
+            return float(np.inf)
+        return float(np.max(np.abs(eigvals)))
+
+    def _stationarity_slack(self, params: NDArray[np.float64]) -> float:
+        """Inequality-constraint slack: positive iff the process is stationary."""
+        _c_mat, a_mat, b_mat = self._unpack_params(np.asarray(params, dtype=np.float64))
+        return 1.0 - 1e-6 - self.stationarity_measure(a_mat, b_mat)
+
+    def _param_bounds(self) -> list[tuple[float, float]]:
+        """Box bounds for (C, A, B).
+
+        The diagonal of C is kept strictly positive (C C' identifiable and PD)
+        and all entries are bounded on the scale of the data; A and B entries
+        are bounded well inside the region where the spectral-radius constraint
+        can still bind.
+        """
+        scale = float(np.sqrt(np.mean(np.diag(np.atleast_2d(np.cov(self.endog.T))))))
+        scale = max(scale, 1e-8)
+        bounds: list[tuple[float, float]] = []
+        for i in range(self.k):
+            for j in range(i + 1):
+                if i == j:
+                    bounds.append((1e-8 * scale, 10.0 * scale))
+                else:
+                    bounds.append((-10.0 * scale, 10.0 * scale))
+        limit = 0.999 if self.variant == "diagonal" else 1.5
+        bounds.extend([(-limit, limit)] * self._n_a_params)
+        bounds.extend([(-limit, limit)] * self._n_b_params)
+        return bounds
+
+    @property
+    def start_params(self) -> NDArray[np.float64]:
+        """Starting parameter values.
+
+        C: Cholesky of (sample_covariance * 0.05); A: diag(0.2); B: diag(0.8).
+        """
+        return self._starting_points()[0]
+
+    def _c_start(self, weight: float) -> NDArray[np.float64]:
+        """Cholesky factor of ``weight`` times the sample covariance."""
+        sample_cov = np.atleast_2d(np.cov(self.endog.T))
+        try:
+            return np.linalg.cholesky(sample_cov * weight).astype(np.float64)
+        except np.linalg.LinAlgError:
+            return np.eye(self.k) * np.sqrt(weight * np.mean(np.diag(sample_cov)))
+
+    def _starting_points(self) -> list[NDArray[np.float64]]:
+        """Several (C, A, B) starts, all inside the stationarity region."""
+        specs = [(0.05, 0.2, 0.8), (0.20, 0.1, 0.5), (0.10, 0.3, 0.7), (0.50, 0.15, 0.2)]
+        return [
+            self._pack_params(
+                self._c_start(weight),
+                np.eye(self.k) * a,
+                np.eye(self.k) * b,
+            )
+            for weight, a, b in specs
+        ]
+
+    def _correlation_recursion(
+        self,
+        params: NDArray[np.float64],  # noqa: ARG002
         std_resids: NDArray[np.float64],
     ) -> NDArray[np.float64]:
-        """Not used for BEKK (BEKK models H_t directly, not R_t).
+        """Not used for BEKK (it models H_t directly, not R_t).
 
-        This method is required by the ABC but BEKK overrides fit() directly.
-        Returns identity correlation matrices as placeholder.
+        Required by the ABC; BEKK overrides ``fit`` and works with H_t.
 
         Parameters
         ----------
@@ -243,63 +399,12 @@ class BEKK(MultivariateVolatilityModel):
         Returns
         -------
         ndarray
-            Correlation matrices derived from H_t, shape (T, k, k).
+            Identity correlation matrices, shape (T, k, k).
         """
         n_obs, k = std_resids.shape
-        r_t = np.zeros((n_obs, k, k))
-        for t in range(n_obs):
-            r_t[t] = np.eye(k)
-        return r_t
+        return np.broadcast_to(np.eye(k), (n_obs, k, k)).copy()
 
-    @property
-    def start_params(self) -> NDArray[np.float64]:
-        """Starting parameter values.
-
-        C: Cholesky of (sample_covariance * 0.05)
-        A: diag(0.2)
-        B: diag(0.8)
-        """
-        sample_cov = np.cov(self.endog.T)
-        try:
-            c_mat = np.linalg.cholesky(sample_cov * 0.05).astype(np.float64)
-        except np.linalg.LinAlgError:
-            c_mat = np.eye(self.k) * np.sqrt(0.05 * np.mean(np.diag(sample_cov)))
-
-        a_mat = np.eye(self.k) * 0.2
-        b_mat = np.eye(self.k) * 0.8
-
-        return self._pack_params(c_mat, a_mat, b_mat)
-
-    @property
-    def param_names(self) -> list[str]:
-        """Parameter names."""
-        k = self.k
-        names: list[str] = []
-
-        # C params
-        for i in range(k):
-            for j in range(i + 1):
-                names.append(f"C[{i},{j}]")
-
-        # A params
-        if self.variant == "diagonal":
-            for i in range(k):
-                names.append(f"A[{i},{i}]")
-        else:
-            for i in range(k):
-                for j in range(k):
-                    names.append(f"A[{i},{j}]")
-
-        # B params
-        if self.variant == "diagonal":
-            for i in range(k):
-                names.append(f"B[{i},{i}]")
-        else:
-            for i in range(k):
-                for j in range(k):
-                    names.append(f"B[{i},{j}]")
-
-        return names
+    # --- Fit ---
 
     def fit(self, method: str = "mle", disp: bool = True) -> MultivarResults:
         """Fit the BEKK-GARCH model via full MLE.
@@ -307,7 +412,7 @@ class BEKK(MultivariateVolatilityModel):
         Parameters
         ----------
         method : str
-            Estimation method. Only 'mle' supported for BEKK.
+            Estimation method. Only 'mle' is supported for BEKK.
         disp : bool
             Display optimization progress.
 
@@ -315,74 +420,61 @@ class BEKK(MultivariateVolatilityModel):
         -------
         MultivarResults
             Fitted model results.
+
+        Raises
+        ------
+        ConvergenceError
+            If no starting point yields a finite log-likelihood.
         """
-        # Demean returns
+        self._check_method(method)
+
         mu = np.mean(self.endog, axis=0)
         resids = self.endog - mu
+        self._mu = mu
 
-        x0 = self.start_params
+        def objective(params: NDArray[np.float64]) -> float:
+            value = self._neg_loglike(params, resids)
+            return PENALTY if not np.isfinite(value) else value
 
-        def neg_loglike(params: NDArray[np.float64]) -> float:
-            """Compute negative log-likelihood for BEKK optimization."""
-            c_mat, a_mat, b_mat = self._unpack_params(params)
-            h_t = self._bekk_recursion(c_mat, a_mat, b_mat, resids)
-
-            n_obs, k = resids.shape
-            ll = 0.0
-            const = k * np.log(2.0 * np.pi)
-
-            for t in range(n_obs):
-                if not is_positive_definite(h_t[t]):
-                    return 1e10
-                try:
-                    sign, logdet = np.linalg.slogdet(h_t[t])
-                    if sign <= 0:
-                        return 1e10
-                    eps = resids[t : t + 1].T  # (k, 1)
-                    h_inv_eps = np.linalg.solve(h_t[t], eps)
-                    quad = float((eps.T @ h_inv_eps).item())
-                    ll += -0.5 * (const + logdet + quad)
-                except np.linalg.LinAlgError:
-                    return 1e10
-
-            return -ll
-
-        result = optimize.minimize(
-            neg_loglike,
-            x0,
-            method="SLSQP",
-            options={"maxiter": 1000, "disp": disp, "ftol": 1e-8},
+        outcome = self._run_multistart(
+            objective=objective,
+            starting_points=self._starting_points(),
+            bounds=self._param_bounds(),
+            constraints=[{"type": "ineq", "fun": self._stationarity_slack}],
+            disp=disp,
+            maxiter=1000,
         )
+        self._warn_if_not_converged(outcome)
 
-        opt_params = result.x
+        opt_params = outcome.params
         c_mat, a_mat, b_mat = self._unpack_params(opt_params)
         h_t = self._bekk_recursion(c_mat, a_mat, b_mat, resids)
+        loglike = self._gaussian_loglike(h_t, resids)
+        if not np.isfinite(loglike):
+            msg = (
+                f"{self.model_name}: no starting point produced a finite "
+                "log-likelihood; the model failed to converge."
+            )
+            raise ConvergenceError(msg)
 
-        # Derive r_t from h_t
-        r_t = np.zeros_like(h_t)
-        cond_vol = np.zeros((self.T, self.k))
-        for t in range(self.T):
-            d = np.sqrt(np.diag(h_t[t]))
-            d = np.maximum(d, 1e-12)
-            cond_vol[t] = d
-            r_t[t] = h_t[t] / np.outer(d, d)
+        cond_vol = np.sqrt(np.maximum(np.diagonal(h_t, axis1=1, axis2=2), 1e-24))
+        r_t = cov_to_corr(h_t)
+        std_resids = resids / cond_vol
 
-        loglike = -result.fun
-
-        n_params = len(opt_params)
+        # AIC/BIC count the k mean parameters removed by demeaning.
+        n_params = len(opt_params) + self.num_mean_params
         aic = -2.0 * loglike + 2.0 * n_params
         bic = -2.0 * loglike + np.log(self.T) * n_params
 
-        # Compute standardized residuals
-        std_resids = np.zeros((self.T, self.k))
-        for t in range(self.T):
-            std_resids[t] = resids[t] / cond_vol[t]
+        std_errors = standard_errors_from_hessian(
+            numerical_hessian(lambda p: self._neg_loglike(p, resids), opt_params)
+        )
 
         self._is_fitted = True
 
         return MultivarResults(
             model=self,
-            univariate_results=[],  # BEKK does not use univariate step
+            univariate_results=[],  # BEKK does not use a univariate step
             params=opt_params,
             dynamic_correlation=r_t,
             dynamic_covariance=h_t,
@@ -393,7 +485,15 @@ class BEKK(MultivariateVolatilityModel):
             bic=bic,
             n_obs=self.T,
             n_series=self.k,
+            param_names=self.param_names,
+            std_errors=std_errors,
+            converged=outcome.converged,
+            series_names=self.series_names,
+            index=self.index,
+            extras={"mu": mu, "resid_last": resids[-1].copy(), "variant": self.variant},
         )
+
+    # --- Forecast ---
 
     def forecast(
         self,
@@ -402,7 +502,14 @@ class BEKK(MultivariateVolatilityModel):
     ) -> dict[str, NDArray[np.float64]]:
         """Forecast H_{T+h} using BEKK dynamics.
 
-        H_{T+h} converges to unconditional covariance H_bar.
+        The one-step forecast is the in-sample recursion applied one step ahead,
+
+            H_{T+1} = C C' + A' eps_T eps_T' A + B' H_T B,
+
+        and for h > 1 the unknown eps eps' is replaced by its conditional
+        expectation H_{T+h-1}:
+
+            H_{T+h} = C C' + A' H_{T+h-1} A + B' H_{T+h-1} B.
 
         Parameters
         ----------
@@ -416,26 +523,22 @@ class BEKK(MultivariateVolatilityModel):
         dict
             Dictionary with 'covariance' and 'correlation' forecasts.
         """
+        if horizon < 1:
+            msg = f"horizon must be >= 1, got {horizon}"
+            raise ValueError(msg)
+
         c_mat, a_mat, b_mat = self._unpack_params(results.params)
         cc = c_mat @ c_mat.T
+        eps_last = np.asarray(results.extras["resid_last"], dtype=np.float64)
 
         h_forecast = np.zeros((horizon, self.k, self.k))
-        r_forecast = np.zeros((horizon, self.k, self.k))
-
-        # For forecast, use E[eps*eps'] = H_T (last estimated)
-        h_prev = results.dynamic_covariance[-1].copy()
+        h_prev = np.asarray(results.dynamic_covariance[-1], dtype=np.float64)
 
         for h in range(horizon):
-            # E[H_{T+h}] = cc + a_mat' H_{T+h-1} a_mat + b_mat' H_{T+h-1} b_mat
-            h_next = cc + a_mat.T @ h_prev @ a_mat + b_mat.T @ h_prev @ b_mat
-            h_next = (h_next + h_next.T) / 2.0
+            shock = np.outer(eps_last, eps_last) if h == 0 else h_prev
+            h_next = cc + a_mat.T @ shock @ a_mat + b_mat.T @ h_prev @ b_mat
+            h_next = 0.5 * (h_next + h_next.T)
             h_forecast[h] = h_next
-
-            # Derive R from H
-            d = np.sqrt(np.diag(h_next))
-            d = np.maximum(d, 1e-12)
-            r_forecast[h] = h_next / np.outer(d, d)
-
             h_prev = h_next
 
-        return {"covariance": h_forecast, "correlation": r_forecast}
+        return {"covariance": h_forecast, "correlation": cov_to_corr(h_forecast)}
