@@ -6,6 +6,9 @@ References
   Measurement Models. Journal of Derivatives, 3(2), 73-84.
 - Christoffersen, P.F. (1998). Evaluating Interval Forecasts.
   International Economic Review, 39(4), 841-862.
+- Basel Committee on Banking Supervision (1996). Supervisory Framework for
+  the Use of "Backtesting" in Conjunction with the Internal Models Approach
+  to Market Risk Capital Requirements.
 """
 
 from __future__ import annotations
@@ -14,6 +17,43 @@ from dataclasses import dataclass
 
 import numpy as np
 from scipy import stats
+
+#: Cumulative binomial probability at which the Basel yellow zone starts.
+BASEL_YELLOW_LEVEL: float = 0.95
+#: Cumulative binomial probability at which the Basel red zone starts.
+BASEL_RED_LEVEL: float = 0.9999
+
+
+def _binomial_zone_threshold(n: int, alpha: float, level: float) -> int:
+    """Smallest violation count whose cumulative binomial probability >= level.
+
+    Parameters
+    ----------
+    n : int
+        Number of observations in the backtest window.
+    alpha : float
+        VaR tail probability (the exception probability under H0).
+    level : float
+        Cumulative probability at which the next zone starts (0.95 for the
+        Basel yellow zone, 0.9999 for the red zone).
+
+    Returns
+    -------
+    int
+        The zone threshold ``x``, clipped to ``[0, n + 1]``. ``n + 1`` means
+        "unreachable with this sample size".
+    """
+    if n <= 0:
+        return 1
+    x = int(stats.binom.ppf(level, n, alpha))
+    x = int(np.clip(x, 0, n + 1))
+    # ``ppf`` can land one step off at the boundary because of floating point:
+    # walk to the exact smallest x with cdf(x) >= level.
+    while x > 0 and float(stats.binom.cdf(x - 1, n, alpha)) >= level:
+        x -= 1
+    while x <= n and float(stats.binom.cdf(x, n, alpha)) < level:
+        x += 1
+    return x
 
 
 @dataclass
@@ -31,6 +71,9 @@ class TestResult:
     df : int
         Degrees of freedom.
     """
+
+    #: Not a pytest test class (the name only looks like one).
+    __test__ = False
 
     statistic: float
     pvalue: float
@@ -93,10 +136,35 @@ class VaRBacktest:
         self.alpha = alpha
 
         # Filter out NaN values
-        valid = ~np.isnan(self.returns) & ~np.isnan(self.var)
+        valid = np.isfinite(self.returns) & np.isfinite(self.var)
+        if not np.any(valid):
+            msg = (
+                "no valid (returns, var_series) pairs to backtest: every observation "
+                "is NaN or infinite. Historical VaR leaves the first `window` values "
+                "NaN - align the series or use a longer sample."
+            )
+            raise ValueError(msg)
+
         self._returns_valid = self.returns[valid]
         self._var_valid = self.var[valid]
         self.hits = (self._returns_valid < self._var_valid).astype(np.int64)
+
+    def _require_observations(self) -> None:
+        """Ensure the hit sequence is non-empty.
+
+        Raises
+        ------
+        ValueError
+            If there is no valid observation to compute a rate from (which
+            would make every ``x / n`` a division by zero).
+        """
+        if len(self.hits) == 0:
+            msg = (
+                "no valid observations in the backtest sample: cannot compute a "
+                "violation rate. Check that returns and var_series overlap and "
+                "are not all NaN."
+            )
+            raise ValueError(msg)
 
     def kupiec_test(self) -> TestResult:
         """Kupiec (1995) Proportion of Failures (POF) test.
@@ -108,12 +176,18 @@ class VaRBacktest:
         TestResult
             LR_POF statistic and p-value, chi2(1).
 
+        Raises
+        ------
+        ValueError
+            If the backtest sample holds no valid observation.
+
         Notes
         -----
         LR_POF = -2 * [x*log(alpha) + (n-x)*log(1-alpha)
                         - x*log(pi_hat) - (n-x)*log(1-pi_hat)]
         LR_POF ~ chi2(1)
         """
+        self._require_observations()
         n = len(self.hits)
         x = int(np.sum(self.hits))
 
@@ -210,6 +284,44 @@ class VaRBacktest:
             df=2,
         )
 
+    def basel_zones(self, window: int = 250) -> tuple[int, int, int]:
+        """Basel traffic-light zone boundaries for this alpha and window.
+
+        The zones follow the Basel (1996) construction: under H0 the number of
+        exceptions is Binomial(n, alpha), the yellow zone starts at the first
+        count whose cumulative probability reaches 95%, and the red zone at the
+        first count whose cumulative probability reaches 99.99%. For the
+        supervisory case (n = 250, alpha = 1%) this reproduces the published
+        table exactly: green 0-4, yellow 5-9, red 10+.
+
+        Parameters
+        ----------
+        window : int
+            Backtesting window in days. Default is 250. The effective sample
+            size is ``min(window, number of valid observations)``.
+
+        Returns
+        -------
+        tuple[int, int, int]
+            ``(n, yellow_min, red_min)``: the effective sample size, the
+            smallest violation count in the yellow zone and the smallest
+            violation count in the red zone.
+
+        Raises
+        ------
+        ValueError
+            If ``window`` is not a positive integer.
+        """
+        window = int(window)
+        if window < 1:
+            msg = f"window must be a positive integer, got {window}"
+            raise ValueError(msg)
+
+        n = min(window, len(self.hits))
+        yellow_min = _binomial_zone_threshold(n, self.alpha, BASEL_YELLOW_LEVEL)
+        red_min = _binomial_zone_threshold(n, self.alpha, BASEL_RED_LEVEL)
+        return n, yellow_min, red_min
+
     def basel_traffic_light(self, window: int = 250) -> str:
         """Basel traffic light system.
 
@@ -225,20 +337,22 @@ class VaRBacktest:
 
         Notes
         -----
-        For 250 days at alpha=1%:
-            - Green: 0-4 violations
-            - Yellow: 5-9 violations
-            - Red: 10+ violations
+        The zone boundaries are derived from the Binomial(n, alpha)
+        distribution for the *actual* ``alpha`` of this backtest and the
+        *actual* number of observations used (see :meth:`basel_zones`), not
+        hardcoded for the 250-day/1% supervisory case.
         """
-        # Use last `window` observations
-        hits_window = self.hits[-window:] if len(self.hits) >= window else self.hits
+        self._require_observations()
+        n, yellow_min, red_min = self.basel_zones(window)
+
+        hits_window = self.hits[-n:]
         n_violations = int(np.sum(hits_window))
 
-        if n_violations <= 4:
-            return "green"
-        if n_violations <= 9:
+        if n_violations >= red_min:
+            return "red"
+        if n_violations >= yellow_min:
             return "yellow"
-        return "red"
+        return "green"
 
     def violation_ratio(self) -> float:
         """Compute the violation ratio.
@@ -249,7 +363,8 @@ class VaRBacktest:
             Observed violation rate / expected violation rate (alpha).
             A ratio of 1.0 indicates perfect calibration.
         """
-        observed_rate = self.hits.mean()
+        self._require_observations()
+        observed_rate = float(np.mean(self.hits))
         return float(observed_rate / self.alpha)
 
     def summary(self) -> str:
@@ -260,9 +375,11 @@ class VaRBacktest:
         str
             Formatted report with all test results.
         """
+        self._require_observations()
         kupiec = self.kupiec_test()
         christoffersen = self.christoffersen_test()
         traffic = self.basel_traffic_light()
+        zone_n, yellow_min, red_min = self.basel_zones()
         vr = self.violation_ratio()
 
         n = len(self.hits)
@@ -287,6 +404,10 @@ class VaRBacktest:
             "",
             "-" * 60,
             f"  Basel Traffic Light: {traffic.upper()}",
+            (
+                f"    (n={zone_n}, alpha={self.alpha:.4f}: green < {yellow_min}"
+                f" <= yellow < {red_min} <= red)"
+            ),
             "=" * 60,
         ]
 

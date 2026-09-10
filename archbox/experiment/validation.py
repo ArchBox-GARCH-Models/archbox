@@ -43,7 +43,10 @@ class ValidationResult:
     alpha: float = 0.05
 
     def rmse_vol(self) -> float:
-        """RMSE between forecast volatility and realized volatility proxy.
+        """RMSE of the variance forecast against the realized-variance proxy.
+
+        Both series are compared on the *variance* scale: the forecast
+        ``sigma^2_t`` against the squared returns.
 
         Returns
         -------
@@ -55,7 +58,10 @@ class ValidationResult:
         return float(np.sqrt(np.mean((forecast_var - realized_var) ** 2)))
 
     def mae_vol(self) -> float:
-        """MAE between forecast volatility and realized volatility proxy.
+        """MAE of the variance forecast against the realized-variance proxy.
+
+        Both series are compared on the *variance* scale: the forecast
+        ``sigma^2_t`` against the squared returns.
 
         Returns
         -------
@@ -69,16 +75,39 @@ class ValidationResult:
     def var_violation_rate(self) -> float:
         """VaR violation rate.
 
+        The comparison is made on the raw return scale: a violation is
+        ``r_t < VaR_t``.
+
         Returns
         -------
         float
-            Fraction of observations where actual return < VaR.
+            Fraction of observations where the actual return is below the VaR.
+
+        Raises
+        ------
+        ValueError
+            If no VaR series was computed, or if it does not align with the
+            out-of-sample returns.
         """
         if self.var_series is None:
             msg = "VaR series not computed. Run with VaR enabled."
             raise ValueError(msg)
-        violations = self.actual_returns < self.var_series
-        return float(np.mean(violations))
+
+        var = np.asarray(self.var_series, dtype=np.float64).ravel()
+        returns = np.asarray(self.actual_returns, dtype=np.float64).ravel()
+        if len(var) != len(returns):
+            msg = (
+                f"var_series and actual_returns must have the same length, "
+                f"got {len(var)} and {len(returns)}"
+            )
+            raise ValueError(msg)
+
+        valid = np.isfinite(var) & np.isfinite(returns)
+        if not np.any(valid):
+            msg = "no valid (return, VaR) pairs: every observation is NaN or infinite."
+            raise ValueError(msg)
+
+        return float(np.mean(returns[valid] < var[valid]))
 
     def plot_forecast_vs_actual(
         self,

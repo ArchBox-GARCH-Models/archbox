@@ -156,10 +156,94 @@ class TestBacktestSummary:
         assert "Christoffersen" in summary
         assert "Basel" in summary
         assert "Violation" in summary
+        assert "yellow" in summary, "the summary reports the zone boundaries in use"
+
+    def test_test_result_is_not_collected_by_pytest(self) -> None:
+        """The dataclass only looks like a test class."""
+        assert TestResult.__test__ is False
+
+
+class TestBaselZones:
+    """The traffic-light zones follow the binomial law of the actual alpha."""
+
+    @staticmethod
+    def _backtest(n: int, alpha: float, n_violations: int) -> VaRBacktest:
+        """Backtest whose hit sequence has exactly ``n_violations`` ones."""
+        returns = np.full(n, 0.0)
+        var_series = np.full(n, -1.0)
+        returns[:n_violations] = -2.0  # below the VaR -> violation
+        return VaRBacktest(returns, var_series, alpha=alpha)
+
+    def test_supervisory_case_matches_basel_table(self) -> None:
+        """n=250, alpha=1%: green 0-4, yellow 5-9, red 10+ (Basel 1996)."""
+        n, yellow_min, red_min = self._backtest(250, 0.01, 0).basel_zones(window=250)
+        assert (n, yellow_min, red_min) == (250, 5, 10)
+
+    @pytest.mark.parametrize(
+        ("n_violations", "expected"),
+        [(0, "green"), (4, "green"), (5, "yellow"), (9, "yellow"), (10, "red"), (30, "red")],
+    )
+    def test_supervisory_zones(self, n_violations: int, expected: str) -> None:
+        bt = self._backtest(250, 0.01, n_violations)
+        assert bt.basel_traffic_light(window=250) == expected
+
+    def test_zones_scale_with_alpha(self) -> None:
+        """Regression: a 5% VaR with ~5% violations is green, not red.
+
+        The thresholds used to be hardcoded for alpha=1% (red at 10
+        violations), which classified a perfectly calibrated 5% VaR as red.
+        """
+        bt = self._backtest(250, 0.05, 13)  # 5.2% violation rate
+        _, yellow_min, red_min = bt.basel_zones(window=250)
+
+        assert yellow_min > 10 and red_min > yellow_min
+        assert bt.basel_traffic_light(window=250) == "green"
+
+    def test_zones_match_the_binomial_cdf(self) -> None:
+        from scipy import stats
+
+        for alpha in (0.01, 0.025, 0.05, 0.10):
+            for window in (100, 250, 500):
+                bt = self._backtest(window, alpha, 0)
+                n, yellow_min, red_min = bt.basel_zones(window=window)
+                assert n == window
+                for threshold, level in ((yellow_min, 0.95), (red_min, 0.9999)):
+                    assert float(stats.binom.cdf(threshold, n, alpha)) >= level
+                    assert float(stats.binom.cdf(threshold - 1, n, alpha)) < level
+
+    def test_zones_use_the_effective_sample_size(self) -> None:
+        """A window longer than the sample falls back to the sample size."""
+        bt = self._backtest(120, 0.01, 0)
+        n, _, _ = bt.basel_zones(window=250)
+        assert n == 120
+
+    def test_invalid_window(self) -> None:
+        bt = self._backtest(100, 0.01, 0)
+        with pytest.raises(ValueError, match="window must be a positive integer"):
+            bt.basel_traffic_light(window=0)
 
 
 class TestBacktestEdgeCases:
     """Edge case tests for VaRBacktest."""
+
+    def test_all_nan_raises(self) -> None:
+        """Regression: all-NaN inputs used to divide by zero."""
+        nans = np.full(50, np.nan)
+        with pytest.raises(ValueError, match="no valid"):
+            VaRBacktest(nans, nans, alpha=0.05)
+
+    def test_non_overlapping_valid_values_raises(self) -> None:
+        returns = np.array([0.01, np.nan, np.nan])
+        var_series = np.array([np.nan, -0.02, -0.02])
+        with pytest.raises(ValueError, match="no valid"):
+            VaRBacktest(returns, var_series, alpha=0.05)
+
+    def test_infinite_values_are_dropped(self) -> None:
+        returns = np.array([0.01, -0.05, np.inf, 0.002])
+        var_series = np.array([-0.02, -0.02, -0.02, -0.02])
+        bt = VaRBacktest(returns, var_series, alpha=0.05)
+        assert len(bt.hits) == 3
+        assert int(bt.hits.sum()) == 1
 
     def test_mismatched_lengths(self) -> None:
         returns = np.random.randn(100)
