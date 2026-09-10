@@ -65,3 +65,23 @@ class TestHongEdgeCases:
         result = hong_spillover_test(z1, z2)
         # bandwidth should be floor(T^(1/3)) = floor(9.999...) = 9
         assert result.bandwidth == 9
+
+
+class TestHongTailPrecision:
+    """p-values come from the normal survival function, not from 1 - cdf."""
+
+    def test_pvalue_matches_survival_function(self, rng: np.random.Generator) -> None:
+        from scipy import stats
+
+        n = 2000
+        z2 = rng.standard_normal(n)
+        # Spillover: series 1 volatility is driven by lagged series 2.
+        variance = 1.0 + 0.2 * np.concatenate([[0.0], z2[:-1] ** 2])
+        z1 = rng.standard_normal(n) * np.sqrt(variance)
+
+        result = hong_spillover_test(z1, z2, bandwidth=10)
+
+        # Deep enough in the tail that 1 - norm.cdf(stat) rounds to exactly 0.
+        assert result.statistic > 10.0
+        assert result.pvalue > 0.0
+        assert result.pvalue == pytest.approx(float(stats.norm.sf(result.statistic)), rel=1e-12)

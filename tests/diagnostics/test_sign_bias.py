@@ -102,3 +102,29 @@ class TestSignBiasEdgeCases:
         assert len(result.neg_sign_bias) == 2
         assert len(result.pos_sign_bias) == 2
         assert len(result.joint) == 2
+
+
+class TestSignBiasTooFewObservations:
+    """The auxiliary regression needs a residual degree of freedom."""
+
+    def test_short_sample_raises(self) -> None:
+        short = np.arange(5, dtype=float)
+        with pytest.raises(ValueError, match="at least"):
+            sign_bias_test(short, short)
+
+    def test_pvalues_use_survival_function(self, rng: np.random.Generator) -> None:
+        from scipy import stats
+
+        n = 4000
+        eps = rng.standard_normal(n)
+        # Very strong sign bias: negative shocks raise next period's variance.
+        scale = np.where(np.concatenate([[0.0], eps[:-1]]) < 0, 3.0, 1.0)
+        z = rng.standard_normal(n) * scale
+
+        result = sign_bias_test(eps, z)
+
+        assert result.joint[0] > 50.0
+        assert result.joint[1] > 0.0
+        assert result.joint[1] == pytest.approx(
+            float(stats.f.sf(result.joint[0], dfn=3, dfd=n - 5)), rel=1e-9
+        )

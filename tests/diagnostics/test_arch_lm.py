@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+from scipy import stats
 
 from archbox.diagnostics.arch_lm import TestResult, arch_lm_test
 
@@ -91,3 +92,35 @@ class TestArchLMEdgeCases:
         e = np.random.randn(20)
         with pytest.raises(ValueError, match="lags"):
             arch_lm_test(e, lags=19)
+
+
+class TestArchLMResultDataclass:
+    """The TestResult container must not be collected as a pytest test."""
+
+    def test_test_attribute_is_false(self) -> None:
+        assert TestResult.__test__ is False
+
+
+class TestArchLMTailPrecision:
+    """p-values come from the survival function, not from 1 - cdf."""
+
+    def test_pvalue_is_positive_deep_in_the_tail(self, rng: np.random.Generator) -> None:
+        n = 3000
+        omega, alpha = 0.1, 0.85
+
+        e = np.empty(n)
+        sigma2 = np.empty(n)
+        sigma2[0] = omega / (1 - alpha)
+        e[0] = np.sqrt(sigma2[0]) * rng.standard_normal()
+        for t in range(1, n):
+            sigma2[t] = omega + alpha * e[t - 1] ** 2
+            e[t] = np.sqrt(sigma2[t]) * rng.standard_normal()
+
+        result = arch_lm_test(e, lags=5)
+
+        # Large enough that 1 - chi2.cdf(stat) rounds to exactly 0.0.
+        assert result.statistic > 100.0
+        assert result.pvalue > 0.0
+        assert result.pvalue == pytest.approx(
+            float(stats.chi2.sf(result.statistic, df=5)), rel=1e-12
+        )
