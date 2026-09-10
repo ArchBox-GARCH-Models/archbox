@@ -1,7 +1,12 @@
 """Value at Risk (VaR) implementations.
 
+Every method returns VaR on the scale of the returns, as a *signed* quantile:
+a value of ``-0.02`` means "a 2% loss". The series are aligned with the return
+series of the fitted model, so ``returns[t] < var[t]`` is a violation at date
+``t``.
+
 Methods:
-    - Parametric (Normal, Student-t)
+    - Parametric (fitted conditional distribution, Normal, Student-t, ...)
     - Historical Simulation
     - Filtered Historical Simulation (Barone-Adesi et al., 1999)
     - Monte Carlo
@@ -17,69 +22,67 @@ References
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 import numpy as np
 from numpy.typing import NDArray
-from scipy import stats
 
-if TYPE_CHECKING:
-    pass
+from archbox.risk.base import RiskMeasure
 
 
-class ValueAtRisk:
+class ValueAtRisk(RiskMeasure):
     """Value at Risk calculator.
 
     Parameters
     ----------
     results : ArchResults
-        Fitted model results from archbox.
+        Fitted model results from archbox (``model.fit()``).
     alpha : float
-        Significance level (e.g., 0.05 for 5% VaR). Default is 0.05.
+        Tail probability (e.g. 0.05 for 95% VaR). Default is 0.05.
 
     Attributes
     ----------
     results : ArchResults
         The fitted model results.
     alpha : float
-        Significance level.
+        Tail probability.
     returns : NDArray[np.float64]
-        The return series from the fitted model.
+        Return series ``r_t = mu + eps_t`` (raw, on the return scale).
+    resid : NDArray[np.float64]
+        Raw residuals ``eps_t``.
+    std_resid : NDArray[np.float64]
+        Standardized residuals ``z_t = eps_t / sigma_t``.
     conditional_volatility : NDArray[np.float64]
-        Conditional volatility series sigma_t.
+        Conditional volatility series ``sigma_t``.
+    mu : float
+        Fitted mean of the return process.
+
+    Examples
+    --------
+    >>> from archbox import GARCH
+    >>> from archbox.datasets import load_dataset
+    >>> returns = load_dataset('sp500')['returns'].to_numpy()
+    >>> res = GARCH(returns).fit(disp=False)
+    >>> var = ValueAtRisk(res, alpha=0.05).parametric()
     """
 
-    def __init__(self, results: object, alpha: float = 0.05) -> None:
-        """Initialize Value-at-Risk calculator from fitted model results."""
-        if not 0 < alpha < 1:
-            msg = f"alpha must be in (0, 1), got {alpha}"
-            raise ValueError(msg)
-
-        self.results = results
-        self.alpha = alpha
-
-        # Extract data from results
-        raw = getattr(results, "resids", None)
-        if raw is None:
-            raw = getattr(results, "resid", None)
-        if raw is None:
-            raw = getattr(results, "endog", None)
-        self.returns: NDArray[np.float64] = np.asarray(raw, dtype=np.float64)
-        self.conditional_volatility: NDArray[np.float64] = np.asarray(
-            getattr(results, "conditional_volatility", None),
-            dtype=np.float64,
-        )
-        self.mu: float = float(getattr(results, "mu", 0.0))
-
-    def parametric(self, dist: str = "normal", nu: float = 8.0) -> NDArray[np.float64]:
+    def parametric(
+        self,
+        dist: str | None = None,
+        nu: float | None = None,
+    ) -> NDArray[np.float64]:
         """Compute parametric VaR.
 
         Parameters
         ----------
-        dist : str
-            Distribution: 'normal' or 'studentt'. Default is 'normal'.
-        nu : float
-            Degrees of freedom for Student-t. Default is 8.0.
+        dist : str, optional
+            Distribution used for the innovation quantile: ``'normal'``,
+            ``'studentt'``, ``'ged'``, ``'skewed-t'``, ``'mixture-normal'``.
+            The default (``None``) uses the distribution the model was fitted
+            with, together with its *estimated* shape parameters.
+        nu : float, optional
+            Degrees of freedom for Student-t. The default (``None``) uses the
+            fitted ``nu`` when the model carries one, and falls back to
+            :data:`~archbox.risk.base.DEFAULT_NU` only when Student-t measures
+            are requested on a model fitted without a ``nu``.
 
         Returns
         -------
@@ -88,28 +91,15 @@ class ValueAtRisk:
 
         Notes
         -----
-        Normal:
-            VaR_alpha = mu + sigma_t * Phi^{-1}(alpha)
+        ``VaR_alpha(t) = mu + sigma_t * F^{-1}_z(alpha)``
 
-        Student-t:
-            VaR_alpha = mu + sigma_t * t^{-1}_nu(alpha) * sqrt((nu-2)/nu)
+        where ``F_z`` is the standardized (zero mean, unit variance)
+        conditional distribution of the innovations. For the Normal this is
+        ``Phi^{-1}(alpha)``; for the Student-t
+        ``t^{-1}_nu(alpha) * sqrt((nu-2)/nu)``.
         """
-        sigma = self.conditional_volatility
-
-        if dist == "normal":
-            z_alpha = stats.norm.ppf(self.alpha)
-            return self.mu + sigma * z_alpha
-
-        if dist == "studentt":
-            if nu <= 2:
-                msg = f"Degrees of freedom must be > 2, got {nu}"
-                raise ValueError(msg)
-            t_alpha = stats.t.ppf(self.alpha, df=nu)
-            scale = np.sqrt((nu - 2) / nu)
-            return self.mu + sigma * t_alpha * scale
-
-        msg = f"Unknown distribution: {dist}. Use 'normal' or 'studentt'."
-        raise ValueError(msg)
+        quantile = self._standardized_quantile(dist, nu)
+        return self.mu + self.conditional_volatility * quantile
 
     def historical(self, window: int = 250) -> NDArray[np.float64]:
         """Compute VaR by Historical Simulation.
@@ -122,51 +112,70 @@ class ValueAtRisk:
         Returns
         -------
         NDArray[np.float64]
-            VaR series, shape (T,). First `window` values are NaN.
+            VaR series, shape (T,). The first ``window`` values are NaN.
+
+        Raises
+        ------
+        ValueError
+            If ``window`` is not a positive integer.
 
         Notes
         -----
-        VaR_alpha = quantile(r_{t-W+1}, ..., r_t ; alpha)
+        ``VaR_alpha(t) = quantile(r_{t-W}, ..., r_{t-1}; alpha)``
+
+        The quantile is taken over the *raw returns* (mean included), so the
+        result is on the return scale, and only observations strictly before
+        ``t`` enter the window (the forecast is out-of-sample at each date).
         """
+        window = int(window)
+        if window < 1:
+            msg = f"window must be a positive integer, got {window}"
+            raise ValueError(msg)
+
         n_obs = len(self.returns)
         var_series = np.full(n_obs, np.nan)
 
         for t in range(window, n_obs):
-            rolling_window = self.returns[t - window : t]
-            var_series[t] = np.quantile(rolling_window, self.alpha)
+            var_series[t] = np.quantile(self.returns[t - window : t], self.alpha)
 
         return var_series
 
-    def filtered_historical(self) -> NDArray[np.float64]:
+    def filtered_historical(self, min_obs: int = 50) -> NDArray[np.float64]:
         """Compute VaR by Filtered Historical Simulation (FHS).
+
+        Parameters
+        ----------
+        min_obs : int
+            Minimum number of standardized residuals required before a
+            quantile is reported. Default is 50.
 
         Returns
         -------
         NDArray[np.float64]
-            VaR series, shape (T,).
+            VaR series, shape (T,). The first ``min_obs`` values are NaN.
 
         Notes
         -----
         Barone-Adesi et al. (1999):
-            1. z_t = (r_t - mu) / sigma_t  (standardized residuals)
-            2. VaR_t = mu + sigma_t * quantile(z_1, ..., z_{t-1} ; alpha)
 
-        The FHS method combines the GARCH volatility dynamics with the
-        empirical distribution of standardized residuals.
+        1. ``z_t = eps_t / sigma_t`` (standardized residuals of the fit)
+        2. ``VaR_t = mu + sigma_t * quantile(z_1, ..., z_{t-1}; alpha)``
+
+        FHS combines the GARCH volatility dynamics (through ``sigma_t``, which
+        is known at ``t-1``) with the empirical distribution of the
+        standardized residuals, so the result is on the return scale.
         """
-        resids = self.returns - self.mu
-        sigma = self.conditional_volatility
-        # Avoid division by zero
-        sigma_safe = np.maximum(sigma, 1e-12)
-        std_resids = resids / sigma_safe
+        min_obs = int(min_obs)
+        if min_obs < 1:
+            msg = f"min_obs must be a positive integer, got {min_obs}"
+            raise ValueError(msg)
 
         n_obs = len(self.returns)
         var_series = np.full(n_obs, np.nan)
+        sigma = self.conditional_volatility
 
-        # Need at least some observations for quantile
-        min_obs = 50
         for t in range(min_obs, n_obs):
-            z_quantile = np.quantile(std_resids[:t], self.alpha)
+            z_quantile = np.quantile(self.std_resid[:t], self.alpha)
             var_series[t] = self.mu + sigma[t] * z_quantile
 
         return var_series
@@ -177,7 +186,7 @@ class ValueAtRisk:
         horizon: int = 1,
         seed: int | None = None,
     ) -> NDArray[np.float64]:
-        """Compute VaR by Monte Carlo simulation.
+        """Compute VaR by Monte Carlo simulation of the fitted model.
 
         Parameters
         ----------
@@ -191,48 +200,21 @@ class ValueAtRisk:
         Returns
         -------
         NDArray[np.float64]
-            VaR estimate(s). If horizon=1, returns scalar-like array.
-            If horizon>1, returns array of shape (horizon,).
+            VaR of the return at each future date, shape ``(horizon,)``, on the
+            return scale. ``result[h]`` is the VaR of ``r_{T+h+1}``.
+
+        Raises
+        ------
+        TypeError
+            If the results do not come from a fitted archbox volatility model.
 
         Notes
         -----
-        1. Use the last conditional variance as starting point.
-        2. Simulate N paths of sigma^2_{T+h} and r_{T+h}.
-        3. VaR_alpha = quantile(simulated returns ; alpha).
+        The paths continue the estimation sample: the one-step conditional
+        variance is the model's own forecast, the innovations are drawn from
+        the *fitted* conditional distribution (Student-t, GED, skewed-t, ...),
+        and multi-step paths iterate the model's own variance recursion, so
+        the simulated variance is path dependent (not deterministic).
         """
-        rng = np.random.default_rng(seed)
-
-        # Extract GARCH parameters from results
-        params = np.asarray(getattr(self.results, "params", None), dtype=np.float64)
-        sigma2_last = self.conditional_volatility[-1] ** 2
-        last_resid = self.returns[-1] - self.mu
-
-        # Parse GARCH(p,q) parameters: [omega, alpha_1, ..., alpha_q, beta_1, ..., beta_p]
-        omega = params[0]
-        # Determine p, q from model if available
-        p = int(getattr(self.results, "p", 1))
-        q = int(getattr(self.results, "q", 1))
-        alphas = params[1 : 1 + q]
-        betas = params[1 + q : 1 + q + p]
-
-        var_series = np.empty(horizon)
-
-        for h in range(horizon):
-            # Simulate n_sims paths for this horizon step
-            sim_returns = np.empty(n_sims)
-
-            for i in range(n_sims):
-                sigma2 = omega + alphas[0] * last_resid**2 + betas[0] * sigma2_last
-                if h > 0:
-                    # For multi-step, use unconditional expectation approximation
-                    persistence = np.sum(alphas) + np.sum(betas)
-                    uncond_var = omega / (1 - persistence) if persistence < 1 else sigma2_last
-                    sigma2 = uncond_var + persistence**h * (sigma2_last - uncond_var)
-
-                sigma2 = max(sigma2, 1e-12)
-                z = rng.standard_normal()
-                sim_returns[i] = self.mu + np.sqrt(sigma2) * z
-
-            var_series[h] = np.quantile(sim_returns, self.alpha)
-
-        return var_series
+        sims = self._simulate_future_returns(n_sims, horizon, seed)
+        return np.quantile(sims, self.alpha, axis=0)

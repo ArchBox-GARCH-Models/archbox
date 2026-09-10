@@ -34,8 +34,14 @@ class EWMAResult:
         The input return series.
     lam : float
         The decay factor lambda.
+    resid : NDArray[np.float64]
+        Raw residuals eps_t = r_t - mu (same as returns for the zero-mean
+        EWMA model). Named as on ``ArchResults`` so the VaR/ES calculators
+        accept an EWMA fit.
     resids : NDArray[np.float64]
-        Residuals (same as returns for zero-mean model).
+        Backwards-compatible alias of ``resid``.
+    std_resid : NDArray[np.float64]
+        Standardized residuals z_t = eps_t / sigma_t.
     mu : float
         Mean (always 0 for EWMA).
     params : NDArray[np.float64]
@@ -50,7 +56,9 @@ class EWMAResult:
     conditional_variance: NDArray[np.float64]
     returns: NDArray[np.float64]
     lam: float
+    resid: NDArray[np.float64] = field(init=False)
     resids: NDArray[np.float64] = field(init=False)
+    std_resid: NDArray[np.float64] = field(init=False)
     mu: float = 0.0
     params: NDArray[np.float64] = field(init=False)
     p: int = 1
@@ -58,7 +66,9 @@ class EWMAResult:
 
     def __post_init__(self) -> None:
         """Compute derived attributes after dataclass initialization."""
-        self.resids = self.returns.copy()
+        self.resid = self.returns - self.mu
+        self.resids = self.resid
+        self.std_resid = self.resid / np.maximum(self.conditional_volatility, 1e-12)
         self.params = np.array([0.0, 1.0 - self.lam, self.lam])
 
 

@@ -205,8 +205,15 @@ class ArchExperiment:
         model_name: str | None = None,
         test_size: int = 500,
         horizon: int = 1,
+        alpha: float = 0.05,
     ) -> ValidationResult:
         """Validate a model out-of-sample.
+
+        The model is re-fitted on the training block only; the reported
+        volatility is the multi-step forecast for the test block and the VaR
+        series is that forecast turned into a return-scale quantile with the
+        *fitted* conditional distribution, so it can be compared directly with
+        the raw test returns.
 
         Parameters
         ----------
@@ -215,13 +222,17 @@ class ArchExperiment:
         test_size : int
             Number of out-of-sample observations.
         horizon : int
-            Forecast horizon.
+            Forecast horizon. Kept for backwards compatibility; the forecast
+            always covers the whole test block.
+        alpha : float
+            Tail probability of the out-of-sample VaR series.
 
         Returns
         -------
         ValidationResult
-            Validation results with RMSE and MAE.
+            Validation results with RMSE, MAE and an out-of-sample VaR series.
         """
+        del horizon  # the forecast always spans the test block
         if model_name is None:
             model_name = next(iter(self.fitted_models))
 
@@ -262,6 +273,13 @@ class ArchExperiment:
         else:
             forecast_vol = np.full(test_size, float(forecast_vol))  # type: ignore[arg-type]
 
+        # Out-of-sample VaR: the forecast volatility scaled by the quantile of
+        # the fitted innovation distribution, on the raw return scale.
+        from archbox.risk.var import ValueAtRisk
+
+        quantile = ValueAtRisk(train_result, alpha=alpha).innovation_quantile()
+        var_series = float(train_result.mu) + forecast_vol * quantile
+
         return ValidationResult(
             model_name=model_name,
             in_sample_size=len(train_returns),
@@ -269,29 +287,48 @@ class ArchExperiment:
             forecast_volatility=forecast_vol,
             actual_returns=test_returns,
             actual_squared_returns=test_returns**2,
+            var_series=var_series,
+            alpha=alpha,
         )
+
+    #: VaR/ES methods understood by :meth:`risk_analysis`. ``monte-carlo``
+    #: produces a forecast for the future (one value per horizon step), not an
+    #: in-sample series, so it is the only one that is not backtested.
+    RISK_METHODS: tuple[str, ...] = ("parametric", "historical", "filtered-hs", "monte-carlo")
 
     def risk_analysis(
         self,
         model: str | None = None,
         alpha: float = 0.05,
         methods: list[str] | None = None,
+        seed: int | None = None,
     ) -> RiskAnalysisResult:
         """Run risk analysis with backtest.
+
+        Every method returns VaR/ES on the scale of the returns, aligned with
+        the return series the model was fitted on, and each in-sample series is
+        backtested against those same (raw) returns.
 
         Parameters
         ----------
         model : str, optional
             Model name. If None, uses the first fitted model.
         alpha : float
-            Significance level.
+            Tail probability of the VaR/ES.
         methods : list[str], optional
-            VaR methods. Default: ['parametric'].
+            VaR methods, any of :data:`RISK_METHODS`. Default: ['parametric'].
+        seed : int, optional
+            Random seed for the 'monte-carlo' method.
 
         Returns
         -------
         RiskAnalysisResult
             Risk analysis results.
+
+        Raises
+        ------
+        ValueError
+            If the model name or one of the methods is unknown.
         """
         if model is None:
             model = next(iter(self.fitted_models))
@@ -303,8 +340,14 @@ class ArchExperiment:
         if methods is None:
             methods = ["parametric"]
 
+        unknown = [m for m in methods if m not in self.RISK_METHODS]
+        if unknown:
+            msg = f"Unknown VaR method(s): {unknown}. Available: {list(self.RISK_METHODS)}"
+            raise ValueError(msg)
+
         result = self.fitted_models[model]
 
+        from archbox.risk.backtest import VaRBacktest
         from archbox.risk.es import ExpectedShortfall
         from archbox.risk.var import ValueAtRisk
 
@@ -325,15 +368,15 @@ class ArchExperiment:
             elif method == "filtered-hs":
                 var_series[method] = var_calc.filtered_historical()
                 es_series[method] = es_calc.filtered_historical()
-            elif method == "monte-carlo":
-                var_series[method] = var_calc.monte_carlo()
+            else:  # monte-carlo: a forecast, not an in-sample series
+                var_series[method] = var_calc.monte_carlo(seed=seed)
+                es_series[method] = es_calc.monte_carlo(seed=seed)
+                continue
 
-            # Backtest
-            from archbox.risk.backtest import VaRBacktest
-
-            test_returns = self.returns[-len(var_series[method]) :]
-            bt = VaRBacktest(test_returns, var_series[method], alpha=alpha)
-            backtest_results[method] = bt
+            # Backtest the in-sample series against the raw returns.
+            series = np.asarray(var_series[method], dtype=np.float64)
+            test_returns = self.returns[len(self.returns) - len(series) :]
+            backtest_results[method] = VaRBacktest(test_returns, series, alpha=alpha)
 
         return RiskAnalysisResult(
             model_name=model,

@@ -162,3 +162,32 @@ class TestEWMAEdgeCases:
         ewma = EWMA(returns_1d, lam=0.94)
         with pytest.raises(ValueError, match="2D"):
             ewma.covariance(returns_1d)
+
+
+class TestEWMAResultRiskAPI:
+    """An EWMA fit satisfies the result contract the VaR/ES calculators need."""
+
+    def test_exposes_raw_and_standardized_residuals(self, returns: np.ndarray) -> None:
+        result = EWMA(returns, lam=0.94).fit()
+
+        np.testing.assert_allclose(result.resid, returns - result.mu)
+        np.testing.assert_allclose(result.resids, result.resid)
+        np.testing.assert_allclose(
+            result.std_resid, result.resid / result.conditional_volatility, rtol=1e-10
+        )
+
+    def test_value_at_risk_on_return_scale(self, returns: np.ndarray) -> None:
+        from archbox.risk.var import ValueAtRisk
+
+        result = EWMA(returns, lam=0.94).fit()
+        var_series = ValueAtRisk(result, alpha=0.05).parametric(dist="normal")
+
+        reference = abs(float(np.quantile(returns, 0.05)))
+        assert 0.3 * reference < float(np.median(np.abs(var_series))) < 3.0 * reference
+
+    def test_monte_carlo_requires_a_fitted_model(self, returns: np.ndarray) -> None:
+        from archbox.risk.var import ValueAtRisk
+
+        result = EWMA(returns, lam=0.94).fit()
+        with pytest.raises(TypeError, match="requires results from a fitted archbox"):
+            ValueAtRisk(result, alpha=0.05).monte_carlo(n_sims=100)
