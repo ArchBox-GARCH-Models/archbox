@@ -14,7 +14,11 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
-from archbox.multivariate.base import MultivariateVolatilityModel, MultivarResults
+from archbox.multivariate.base import (
+    MultivariateVolatilityModel,
+    MultivarResults,
+    correlation_loglike,
+)
 
 
 class DCC(MultivariateVolatilityModel):
@@ -89,25 +93,25 @@ class DCC(MultivariateVolatilityModel):
         q_bar = std_resids.T @ std_resids / n_obs
         self._Q_bar = q_bar
 
-        q_mat = np.zeros((n_obs, k, k))
-        r_mat = np.zeros((n_obs, k, k))
+        q_mat = np.empty((n_obs, k, k))
 
         # Initialize Q_0 = Q_bar
-        q_mat[0] = q_bar.copy()
+        q_mat[0] = q_bar
 
-        # Normalize Q_0 to R_0
-        d = np.sqrt(np.diag(q_mat[0]))
-        d = np.maximum(d, 1e-12)
-        r_mat[0] = q_mat[0] / np.outer(d, d)
+        # Outer products z_{t} z_{t}' for every t, computed once.
+        outer = std_resids[:, :, None] * std_resids[:, None, :]
+        const = (1.0 - a - b) * q_bar
 
+        q_prev = q_mat[0]
         for t in range(1, n_obs):
-            z = std_resids[t - 1 : t].T  # (k, 1)
-            q_mat[t] = (1.0 - a - b) * q_bar + a * (z @ z.T) + b * q_mat[t - 1]
+            q_prev = const + a * outer[t - 1] + b * q_prev
+            q_mat[t] = q_prev
 
-            # Normalize to correlation matrix
-            d = np.sqrt(np.diag(q_mat[t]))
-            d = np.maximum(d, 1e-12)
-            r_mat[t] = q_mat[t] / np.outer(d, d)
+        # Normalize every Q_t to a correlation matrix in one vectorised pass:
+        # R_t = diag(Q_t)^{-1/2} Q_t diag(Q_t)^{-1/2}
+        d = np.sqrt(np.diagonal(q_mat, axis1=1, axis2=2))
+        d = np.maximum(d, 1e-12)
+        r_mat: NDArray[np.float64] = q_mat / (d[:, :, None] * d[:, None, :])
 
         return r_mat
 
@@ -158,23 +162,9 @@ class DCC(MultivariateVolatilityModel):
                 return 1e10
 
             r_t = self._correlation_recursion(params, std_resids)
-            n_obs = std_resids.shape[0]
-            ll = 0.0
-
-            for t in range(n_obs):
-                r_cur = r_t[t]
-                z = std_resids[t : t + 1].T  # (k, 1)
-
-                try:
-                    sign, logdet = np.linalg.slogdet(r_cur)
-                    if sign <= 0:
-                        return 1e10
-                    r_inv_z = np.linalg.solve(r_cur, z)
-                    quad_r = (z.T @ r_inv_z).item()
-                    quad_i = (z.T @ z).item()
-                    ll += -0.5 * (logdet + quad_r - quad_i)
-                except np.linalg.LinAlgError:
-                    return 1e10
+            ll = correlation_loglike(r_t, std_resids)
+            if not np.isfinite(ll):
+                return 1e10
 
             return -ll
 

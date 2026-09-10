@@ -56,9 +56,9 @@ class TestStudentT:
         ll_t = np.sum(dist_t.loglikelihood(z, sigma2))
         ll_normal_approx = np.sum(dist_normal_approx.loglikelihood(z, sigma2))
 
-        assert (
-            ll_t > ll_normal_approx
-        ), "Student-t(nu=4) should fit fat-tailed data better than near-Normal"
+        assert ll_t > ll_normal_approx, (
+            "Student-t(nu=4) should fit fat-tailed data better than near-Normal"
+        )
 
     def test_student_t_simulate(self) -> None:
         dist = StudentT(nu=5.0)

@@ -116,9 +116,9 @@ class TestKimSmootherProbabilities:
 
         # Smoothed should have smaller or similar variance in differences
         # (less jumpy)
-        assert (
-            smoothed_var <= filtered_var * 1.1
-        ), f"Smoothed variance {smoothed_var:.6f} > Filtered variance {filtered_var:.6f}"
+        assert smoothed_var <= filtered_var * 1.1, (
+            f"Smoothed variance {smoothed_var:.6f} > Filtered variance {filtered_var:.6f}"
+        )
 
 
 class TestKimSmootherVectorized:

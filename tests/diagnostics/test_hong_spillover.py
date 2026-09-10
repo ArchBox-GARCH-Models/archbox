@@ -32,9 +32,9 @@ class TestHongDetectsSpillover:
         result = hong_spillover_test(z1_std, z2_std, bandwidth=10)
 
         assert isinstance(result, HongSpilloverResult)
-        assert (
-            result.statistic > 0
-        ), f"Hong statistic should be positive with spillover, got {result.statistic:.4f}"
+        assert result.statistic > 0, (
+            f"Hong statistic should be positive with spillover, got {result.statistic:.4f}"
+        )
 
 
 class TestHongNoSpillover:
@@ -47,9 +47,9 @@ class TestHongNoSpillover:
 
         result = hong_spillover_test(z1, z2, bandwidth=10)
 
-        assert (
-            result.pvalue > 0.01
-        ), f"Hong should not strongly reject for independent series, p={result.pvalue:.4f}"
+        assert result.pvalue > 0.01, (
+            f"Hong should not strongly reject for independent series, p={result.pvalue:.4f}"
+        )
 
 
 class TestHongEdgeCases:

@@ -50,9 +50,9 @@ class TestSignBiasDetectsAsymmetry:
 
         assert isinstance(result, SignBiasResult)
         # Joint test should detect asymmetry (at least marginally)
-        assert (
-            result.joint[1] < 0.20
-        ), f"Joint sign bias should detect asymmetry, p={result.joint[1]:.4f}"
+        assert result.joint[1] < 0.20, (
+            f"Joint sign bias should detect asymmetry, p={result.joint[1]:.4f}"
+        )
 
 
 class TestSignBiasSymmetricGARCH:
@@ -79,9 +79,9 @@ class TestSignBiasSymmetricGARCH:
         result = sign_bias_test(returns, std_resids)
 
         # Joint test should NOT reject for symmetric GARCH
-        assert (
-            result.joint[1] > 0.05
-        ), f"Joint sign bias should not reject for symmetric GARCH, p={result.joint[1]:.4f}"
+        assert result.joint[1] > 0.05, (
+            f"Joint sign bias should not reject for symmetric GARCH, p={result.joint[1]:.4f}"
+        )
 
 
 class TestSignBiasEdgeCases:

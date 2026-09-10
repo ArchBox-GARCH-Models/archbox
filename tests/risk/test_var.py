@@ -82,9 +82,9 @@ class TestParametricVaRStudentT:
 
         # Student-t VaR should be more negative (larger loss) due to heavier tails
         # At 1% level, t(5) quantile * sqrt((nu-2)/nu) > normal quantile in magnitude
-        assert np.all(
-            var_studentt < var_normal
-        ), "Student-t VaR should be more extreme than Normal VaR"
+        assert np.all(var_studentt < var_normal), (
+            "Student-t VaR should be more extreme than Normal VaR"
+        )
 
 
 class TestViolationRateParametric:
@@ -99,9 +99,9 @@ class TestViolationRateParametric:
         violations = (returns < var_series).mean()
 
         # Violation rate should be close to alpha (within 20%)
-        assert (
-            abs(violations - alpha) / alpha < 0.20
-        ), f"Violation rate {violations:.4f} too far from alpha={alpha}"
+        assert abs(violations - alpha) / alpha < 0.20, (
+            f"Violation rate {violations:.4f} too far from alpha={alpha}"
+        )
 
 
 class TestFilteredHSBetter:
@@ -130,9 +130,9 @@ class TestFilteredHSBetter:
         dev_fhs = abs(viol_fhs - alpha)
 
         # FHS should be at least not worse (allow some tolerance)
-        assert (
-            dev_fhs <= dev_hs + 0.02
-        ), f"FHS deviation {dev_fhs:.4f} should be <= HS deviation {dev_hs:.4f}"
+        assert dev_fhs <= dev_hs + 0.02, (
+            f"FHS deviation {dev_fhs:.4f} should be <= HS deviation {dev_hs:.4f}"
+        )
 
 
 class TestMonteCarloConvergence:

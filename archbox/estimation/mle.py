@@ -42,9 +42,20 @@ _MAX_TARGET_PERSISTENCE = 0.9999
 _FD_EPS = 1e-5
 _FD_MIN_SCALE = 1e-3
 
-#: Weight of the quadratic penalty applied to a candidate that leaves the
-#: declared bounds, and the cap on the (relative) violation that feeds it.
-_BOUND_PENALTY = 1e4
+#: Weight of the penalty applied to a candidate that leaves the declared
+#: bounds, and the cap on the (relative) violation that feeds it.
+#:
+#: Both are deliberately modest. The penalty is added to a negative
+#: log-likelihood, and a line search routinely proposes points whose transform
+#: overshoots a bound by many orders of magnitude; a raw squared relative
+#: violation (up to ``_MAX_REL_VIOLATION**2 = 1e12``) then dwarfs the objective
+#: and turns the bound into a cliff that wrecks the quadratic model SLSQP
+#: builds - measurably more iterations *and* a worse optimum. Squaring
+#: ``log1p(violation)`` instead keeps the penalty in the tens for even the
+#: wildest overshoot while remaining ``~violation**2`` for the small violations
+#: that matter, and a unit weight is still overwhelming next to the likelihood
+#: differences seen near convergence (~1e-6).
+_BOUND_PENALTY = 1.0
 _MAX_REL_VIOLATION = 1e6
 
 
@@ -140,13 +151,16 @@ class MLEstimator:
 
     @staticmethod
     def _bound_penalty(raw: NDArray[np.float64], projected: NDArray[np.float64]) -> float:
-        """Quadratic penalty for the distance between a candidate and its projection.
+        """Penalty for the distance between a candidate and its projection.
 
         Clipping alone would make the objective flat outside the box, and a
         finite-difference optimizer can then simply stop on the bound. Adding
-        the (relative, squared) violation restores a gradient that points back
-        inside, so the likelihood is still only ever evaluated at feasible
-        parameters but the search is pushed into the interior.
+        the squared ``log1p`` of the relative violation restores a gradient that
+        points back inside, so the likelihood is still only ever evaluated at
+        feasible parameters but the search is pushed into the interior. It is
+        quadratic in the violation where the violation is small, and grows only
+        logarithmically once the candidate is wildly infeasible - see
+        :data:`_BOUND_PENALTY` for why that matters.
 
         Parameters
         ----------
@@ -164,7 +178,7 @@ class MLEstimator:
         if not np.any(violation > 0.0):
             return 0.0
         scale = np.maximum(np.abs(projected), 1e-8)
-        relative = np.minimum(violation / scale, _MAX_REL_VIOLATION)
+        relative = np.log1p(np.minimum(violation / scale, _MAX_REL_VIOLATION))
         return float(_BOUND_PENALTY * np.sum(relative**2))
 
     def _constrain_full(
@@ -226,7 +240,11 @@ class MLEstimator:
             projected = np.clip(raw, lower, upper)
             full = projected if fixed_tail is None else np.concatenate([projected, fixed_tail])
             value = -model.loglike(full, backcast)
-            if not np.array_equal(projected, raw):
+            # `projected` comes from `raw` via np.clip, so a plain elementwise
+            # comparison is enough (and cheaper than np.array_equal in this hot
+            # path); NaNs compare unequal and therefore take the penalty branch,
+            # exactly as before.
+            if np.any(projected != raw):
                 value += self._bound_penalty(raw, projected)
             return value
 

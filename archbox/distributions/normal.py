@@ -46,7 +46,17 @@ class Normal(Distribution):
         ndarray
             Log-likelihood per observation, shape (T,).
         """
-        return -0.5 * (_LOG_2PI + np.log(sigma2) + resids**2 / sigma2)
+        # Written as in-place updates on two freshly allocated buffers: the
+        # optimizer calls this on every likelihood evaluation, and the naive
+        # expression allocates five temporaries of length T instead of two.
+        # The arithmetic (and its floating-point result) is unchanged.
+        out = np.log(sigma2)
+        out += _LOG_2PI
+        ratio = np.square(resids)
+        ratio /= sigma2
+        out += ratio
+        out *= -0.5
+        return out
 
     def ppf(self, q: float | NDArray[np.float64]) -> Any:
         """Normal percent point function.

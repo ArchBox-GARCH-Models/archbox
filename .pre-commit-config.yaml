@@ -1,8 +1,12 @@
 repos:
+  # Keep this pin in step with the `ruff` version in [project.optional-dependencies].dev:
+  # a hook older than the ruff on PATH formats the tree one way and the CLI check
+  # (`ruff format --check archbox tests`) demands another, and the two rewrite each
+  # other on every commit.
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.4.0
+    rev: v0.16.4
     hooks:
-      - id: ruff
+      - id: ruff-check
         args: [--fix]
       - id: ruff-format
 

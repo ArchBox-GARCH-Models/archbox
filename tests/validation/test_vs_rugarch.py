@@ -94,9 +94,30 @@ class TestVsRugarchGARCH:
                     assert_param_close(ab_params[ab_key], r_params[key], tol_pct, key)
 
         # Log-likelihood
-        assert (
-            abs(results.loglike - fixture["loglikelihood"]) < tol_ll
-        ), f"loglike: archbox={results.loglike:.2f}, R={fixture['loglikelihood']:.2f}"
+        assert abs(results.loglike - fixture["loglikelihood"]) < tol_ll, (
+            f"loglike: archbox={results.loglike:.2f}, R={fixture['loglikelihood']:.2f}"
+        )
+
+    def test_garch11_normal_mean_model(self) -> None:
+        """archbox's constant mean is the sample mean, not a jointly estimated one.
+
+        The rugarch fixture carries ``mu = 4e-4``, the mean R estimates jointly
+        with the variance parameters (so weighted by ``1 / sigma_t^2``). archbox
+        removes the *sample* mean before fitting, so its ``mu`` is
+        ``mean(returns) = -1.32e-4``: the one entry of the fixture that
+        :meth:`test_garch11_normal` deliberately does not compare. That is a
+        documented property of the mean model (see ``VolatilityModel``), and it
+        is pinned here so a silent change to it is caught - the variance
+        parameters and the log-likelihood, which the fixture *is* compared on,
+        are unaffected.
+        """
+        from archbox.models.garch import GARCH
+
+        model = GARCH(self.returns, p=1, q=1, dist="normal")
+        results = model.fit(disp=False)
+
+        assert results.mu == pytest.approx(float(np.mean(self.returns)), rel=1e-12)
+        np.testing.assert_allclose(results.resid, self.returns - results.mu, atol=0.0)
 
     @pytest.mark.xfail(
         strict=True,
@@ -157,9 +178,9 @@ class TestVsRugarchGARCH:
         results = model.fit(disp=False)
 
         assert results.params is not None
-        assert (
-            abs(results.loglike - fixture["loglikelihood"]) < tol_ll
-        ), f"loglike: archbox={results.loglike:.2f}, R={fixture['loglikelihood']:.2f}"
+        assert abs(results.loglike - fixture["loglikelihood"]) < tol_ll, (
+            f"loglike: archbox={results.loglike:.2f}, R={fixture['loglikelihood']:.2f}"
+        )
 
     def test_gjr11_normal(self) -> None:
         """GJR-GARCH(1,1) Normal vs rugarch."""
@@ -172,9 +193,9 @@ class TestVsRugarchGARCH:
         results = model.fit(disp=False)
 
         assert results.params is not None
-        assert (
-            abs(results.loglike - fixture["loglikelihood"]) < tol_ll
-        ), f"loglike: archbox={results.loglike:.2f}, R={fixture['loglikelihood']:.2f}"
+        assert abs(results.loglike - fixture["loglikelihood"]) < tol_ll, (
+            f"loglike: archbox={results.loglike:.2f}, R={fixture['loglikelihood']:.2f}"
+        )
 
     def test_aparch11_normal(self) -> None:
         """APARCH(1,1) Normal vs rugarch."""
@@ -187,9 +208,9 @@ class TestVsRugarchGARCH:
         results = model.fit(disp=False)
 
         assert results.params is not None
-        assert (
-            abs(results.loglike - fixture["loglikelihood"]) < tol_ll
-        ), f"loglike: archbox={results.loglike:.2f}, R={fixture['loglikelihood']:.2f}"
+        assert abs(results.loglike - fixture["loglikelihood"]) < tol_ll, (
+            f"loglike: archbox={results.loglike:.2f}, R={fixture['loglikelihood']:.2f}"
+        )
 
 
 class TestParameterConsistency:

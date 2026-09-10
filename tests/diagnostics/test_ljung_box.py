@@ -29,9 +29,9 @@ class TestLjungBoxRejectsARCH:
         result = ljung_box_squared(e / np.std(e), lags=10)
 
         assert isinstance(result, LjungBoxResult)
-        assert (
-            result.pvalue < 0.05
-        ), f"Ljung-Box should reject for ARCH process, p={result.pvalue:.4f}"
+        assert result.pvalue < 0.05, (
+            f"Ljung-Box should reject for ARCH process, p={result.pvalue:.4f}"
+        )
 
 
 class TestLjungBoxAcceptsIID:
@@ -64,9 +64,9 @@ class TestLjungBoxAcceptsGARCHResiduals:
         std_resids = returns / np.sqrt(sigma2)
         result = ljung_box_squared(std_resids, lags=10)
 
-        assert (
-            result.pvalue > 0.05
-        ), f"Ljung-Box should not reject GARCH residuals, p={result.pvalue:.4f}"
+        assert result.pvalue > 0.05, (
+            f"Ljung-Box should not reject GARCH residuals, p={result.pvalue:.4f}"
+        )
 
 
 class TestLjungBoxEdgeCases:

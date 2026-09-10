@@ -106,9 +106,9 @@ class TestSETAR:
         p1 = results.params["regime_1"]
         p2 = results.params["regime_2"]
         # Parameters should be similar
-        assert np.allclose(
-            p1, p2, atol=0.4
-        ), f"Regime params too different for linear DGP: {p1} vs {p2}"
+        assert np.allclose(p1, p2, atol=0.4), (
+            f"Regime params too different for linear DGP: {p1} vs {p2}"
+        )
 
     def test_setar_three_regimes(self) -> None:
         """SETAR(3) with 2 thresholds should be functional."""

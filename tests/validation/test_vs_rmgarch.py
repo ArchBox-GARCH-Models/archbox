@@ -49,18 +49,18 @@ class TestVsRmgarchDCC:
         assert np.isfinite(results.loglike)
 
         # Compare log-likelihood (within tolerance)
-        assert (
-            abs(results.loglike - fixture["loglikelihood"]) < tol_ll
-        ), f"DCC loglike: archbox={results.loglike:.2f}, R={fixture['loglikelihood']:.2f}"
+        assert abs(results.loglike - fixture["loglikelihood"]) < tol_ll, (
+            f"DCC loglike: archbox={results.loglike:.2f}, R={fixture['loglikelihood']:.2f}"
+        )
 
         # Dynamic correlation should be reasonable
         dyn_corr = results.dynamic_correlation
         mean_corr = float(np.mean(dyn_corr[:, 0, 1]))
         expected_corr = fixture.get("mean_correlation", 0.45)
         corr_tol = fixture["tolerance"].get("correlation_abs", 0.05)
-        assert (
-            abs(mean_corr - expected_corr) < corr_tol + 0.2
-        ), f"Mean correlation: archbox={mean_corr:.4f}, R={expected_corr:.4f}"
+        assert abs(mean_corr - expected_corr) < corr_tol + 0.2, (
+            f"Mean correlation: archbox={mean_corr:.4f}, R={expected_corr:.4f}"
+        )
 
 
 class TestVsRmgarchCCC:

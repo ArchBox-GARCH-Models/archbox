@@ -68,9 +68,9 @@ class TestESGreaterThanVaR:
         es_series = es.parametric(dist="normal")
 
         # ES should always be more negative (larger loss) than VaR
-        assert np.all(
-            es_series <= var_series
-        ), "ES must always be <= VaR (more negative, larger expected loss)"
+        assert np.all(es_series <= var_series), (
+            "ES must always be <= VaR (more negative, larger expected loss)"
+        )
 
     def test_es_greater_than_var_studentt(self, mock_garch_results: MockResults) -> None:
         alpha = 0.05

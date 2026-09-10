@@ -63,7 +63,22 @@ class VolatilityModel(ABC):
     volatility_process : str
         Name of the volatility process.
     mu : float
-        Estimated mean (0 if mean='zero').
+        Mean removed from the returns before the variance recursion
+        (0 if mean='zero').
+
+    Notes
+    -----
+    The constant mean is handled in two steps: ``mu`` is the **sample mean** of
+    the returns and only the variance (and distribution) parameters enter the
+    likelihood maximised by :meth:`fit`. R's ``rugarch`` instead estimates
+    ``mu`` jointly with the variance parameters, which effectively weights each
+    observation by ``1 / sigma_t^2``. On a series whose mean is close to zero
+    the two estimators can disagree by more than their own magnitude - on the
+    bundled ``sp500`` series ``mu`` is ``-1.32e-4`` here against ``4e-4`` in the
+    rugarch reference - while the variance parameters, the persistence and the
+    log-likelihood still agree to well within the validation tolerances (see
+    ``tests/validation/test_vs_rugarch.py``). ``ArchResults.resid`` is always
+    ``endog``, i.e. the returns with this ``mu`` already removed.
     """
 
     volatility_process: str = "Unknown"
@@ -538,8 +553,10 @@ class VolatilityModel(ABC):
         var_params = params[:nv]
         dist_params = params[nv:]
         sigma2 = self._variance_recursion(var_params, self.endog, backcast)
-        # Ensure positivity
-        sigma2 = np.maximum(sigma2, 1e-12)
+        # Ensure positivity. `_variance_recursion` always returns a freshly
+        # allocated array, so the floor is applied in place: this is the hot
+        # path of every fit and the copy is pure overhead.
+        np.maximum(sigma2, 1e-12, out=sigma2)
         ll_per_obs = self.dist.loglikelihood(self.endog, sigma2, dist_params)
         return float(np.sum(ll_per_obs))
 
@@ -566,7 +583,7 @@ class VolatilityModel(ABC):
         var_params = params[:nv]
         dist_params = params[nv:]
         sigma2 = self._variance_recursion(var_params, self.endog, backcast)
-        sigma2 = np.maximum(sigma2, 1e-12)
+        np.maximum(sigma2, 1e-12, out=sigma2)
         return self.dist.loglikelihood(self.endog, sigma2, dist_params)
 
     # --- Simulation hooks -------------------------------------------------

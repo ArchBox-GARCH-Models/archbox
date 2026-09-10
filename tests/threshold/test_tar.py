@@ -47,9 +47,9 @@ class TestTAR:
 
         # Threshold should be close to true value
         y_range = np.max(y) - np.min(y)
-        assert (
-            abs(results.threshold - c_true) < 0.10 * y_range
-        ), f"Threshold {results.threshold:.4f} too far from true {c_true}"
+        assert abs(results.threshold - c_true) < 0.10 * y_range, (
+            f"Threshold {results.threshold:.4f} too far from true {c_true}"
+        )
 
         # Should have two regimes
         assert results.n_regimes == 2
@@ -71,9 +71,9 @@ class TestTAR:
         # Both regimes should have similar parameters
         p1 = results.params["regime_1"]
         p2 = results.params["regime_2"]
-        assert np.allclose(
-            p1, p2, atol=0.3
-        ), f"Regime params too different for linear DGP: {p1} vs {p2}"
+        assert np.allclose(p1, p2, atol=0.3), (
+            f"Regime params too different for linear DGP: {p1} vs {p2}"
+        )
 
     def test_tar_grid_search(self) -> None:
         """Grid search should find c that minimizes RSS."""
@@ -112,9 +112,9 @@ class TestTAR:
         # The variance ratio should be roughly preserved
         true_ratio = sigma2_true**2 / sigma1_true**2
         est_ratio = max(s1_est, s2_est) / min(s1_est, s2_est)
-        assert (
-            est_ratio > 2.0
-        ), f"Variance ratio {est_ratio:.2f} too small, expected ~{true_ratio:.2f}"
+        assert est_ratio > 2.0, (
+            f"Variance ratio {est_ratio:.2f} too small, expected ~{true_ratio:.2f}"
+        )
 
     def test_tar_summary(self) -> None:
         """summary() should return a formatted string."""

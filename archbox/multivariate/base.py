@@ -13,6 +13,43 @@ if TYPE_CHECKING:
     pass
 
 
+def correlation_loglike(
+    corr_t: NDArray[np.float64],
+    std_resids: NDArray[np.float64],
+) -> float:
+    """Correlation part of the Gaussian log-likelihood, vectorised over time.
+
+    Computes ``-0.5 * sum_t [log|R_t| + z_t' R_t^{-1} z_t - z_t' z_t]`` with a
+    single batched ``slogdet``/``solve`` instead of a Python loop over t.
+
+    Parameters
+    ----------
+    corr_t : ndarray
+        Dynamic correlation matrices (T, k, k).
+    std_resids : ndarray
+        Standardized residuals (T, k).
+
+    Returns
+    -------
+    float
+        The correlation log-likelihood, or ``-inf`` if any R_t is not positive
+        definite or the linear solve fails.
+    """
+    sign, logdet = np.linalg.slogdet(corr_t)
+    if np.any(sign <= 0.0) or not np.all(np.isfinite(logdet)):
+        return -np.inf
+    try:
+        solved = np.linalg.solve(corr_t, std_resids[:, :, None])[:, :, 0]
+    except np.linalg.LinAlgError:
+        return -np.inf
+    quad_r = np.einsum("tk,tk->t", std_resids, solved)
+    quad_i = np.einsum("tk,tk->t", std_resids, std_resids)
+    total = float(np.sum(logdet + quad_r - quad_i))
+    if not np.isfinite(total):
+        return -np.inf
+    return -0.5 * total
+
+
 class MultivariateVolatilityModel(ABC):
     """Abstract base class for multivariate GARCH models.
 
@@ -220,19 +257,9 @@ class MultivariateVolatilityModel(ABC):
         def neg_loglike(params: NDArray[np.float64]) -> float:
             """Compute negative correlation log-likelihood for optimization."""
             corr_t = self._correlation_recursion(params, std_resids)
-            ll = 0.0
-            n_obs, _n_k = std_resids.shape
-            for t in range(n_obs):
-                r_mat = corr_t[t]
-                z = std_resids[t : t + 1].T  # (k, 1)
-                try:
-                    sign, logdet = np.linalg.slogdet(r_mat)
-                    if sign <= 0:
-                        return 1e10
-                    r_inv = np.linalg.solve(r_mat, z)
-                    ll += -0.5 * (logdet + (z.T @ r_inv).item() - (z.T @ z).item())
-                except np.linalg.LinAlgError:
-                    return 1e10
+            ll = correlation_loglike(corr_t, std_resids)
+            if not np.isfinite(ll):
+                return 1e10
             return -ll
 
         result = optimize.minimize(
@@ -268,11 +295,8 @@ class MultivariateVolatilityModel(ABC):
         ndarray
             Dynamic covariance matrices (T, k, k).
         """
-        n_obs, n_k = cond_vol.shape
-        cov_t = np.zeros((n_obs, n_k, n_k))
-        for t in range(n_obs):
-            d_mat = np.diag(cond_vol[t])
-            cov_t[t] = d_mat @ corr_t[t] @ d_mat
+        # H_t = D_t R_t D_t with D_t = diag(sigma_t), i.e. H_{t,ij} = s_i R_{t,ij} s_j.
+        cov_t: NDArray[np.float64] = cond_vol[:, :, None] * corr_t * cond_vol[:, None, :]
         return cov_t
 
     def _loglikelihood(
@@ -300,24 +324,22 @@ class MultivariateVolatilityModel(ABC):
             Total log-likelihood.
         """
         n_obs, n_k = std_resids.shape
-        ll = 0.0
         const = n_k * np.log(2.0 * np.pi)
 
-        for t in range(n_obs):
-            log_det_d = np.sum(np.log(cond_vol[t]))
-            z = std_resids[t : t + 1].T  # (k, 1)
+        sign, logdet_r = np.linalg.slogdet(corr_t)
+        if np.any(sign <= 0.0) or not np.all(np.isfinite(logdet_r)):
+            return -1e10
+        try:
+            solved = np.linalg.solve(corr_t, std_resids[:, :, None])[:, :, 0]
+        except np.linalg.LinAlgError:
+            return -1e10
 
-            try:
-                sign, logdet_r = np.linalg.slogdet(corr_t[t])
-                if sign <= 0:
-                    return -1e10
-                r_inv_z = np.linalg.solve(corr_t[t], z)
-                quad = (z.T @ r_inv_z).item()
-            except np.linalg.LinAlgError:
-                return -1e10
-
-            ll += -0.5 * (const + 2.0 * log_det_d + logdet_r + quad)
-
+        quad = np.einsum("tk,tk->t", std_resids, solved)
+        log_det_d = np.sum(np.log(cond_vol), axis=1)
+        total = float(np.sum(2.0 * log_det_d + logdet_r + quad)) + const * n_obs
+        ll = -0.5 * total
+        if not np.isfinite(ll):
+            return -1e10
         return ll
 
     def covariance(self, corr_t: NDArray[np.float64], t: int) -> NDArray[np.float64]:

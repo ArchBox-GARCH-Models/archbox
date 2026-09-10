@@ -42,9 +42,9 @@ class TestGJRGARCH:
         model = GJRGARCH(sp500_returns, p=1, q=1)
         results = model.fit(disp=False)
         gamma_idx = 2
-        assert (
-            results.params[gamma_idx] > 0
-        ), f"GJR gamma should be > 0 for SP500, got {results.params[gamma_idx]}"
+        assert results.params[gamma_idx] > 0, (
+            f"GJR gamma should be > 0 for SP500, got {results.params[gamma_idx]}"
+        )
 
     def test_gjr_forecast(self, sp500_returns: np.ndarray):
         model = GJRGARCH(sp500_returns, p=1, q=1)

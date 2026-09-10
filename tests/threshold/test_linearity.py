@@ -83,18 +83,18 @@ class TestLinearityLST:
 
         assert result.test_name == "Luukkonen-Saikkonen-Terasvirta"
         assert result.statistic > 0
-        assert (
-            result.pvalue < 0.05
-        ), f"Failed to reject linearity: p={result.pvalue:.4f} (expected < 0.05)"
+        assert result.pvalue < 0.05, (
+            f"Failed to reject linearity: p={result.pvalue:.4f} (expected < 0.05)"
+        )
 
     def test_lst_accepts_linear(self) -> None:
         """LM test should NOT reject H0 for linear AR DGP (p > 0.05)."""
         y = _simulate_linear_ar(n=2000, seed=42)
         result = linearity_test(y, order=1, delay=1)
 
-        assert (
-            result.pvalue > 0.05
-        ), f"Incorrectly rejected linearity: p={result.pvalue:.4f} (expected > 0.05)"
+        assert result.pvalue > 0.05, (
+            f"Incorrectly rejected linearity: p={result.pvalue:.4f} (expected > 0.05)"
+        )
 
     def test_lst_output_format(self) -> None:
         """Test output format of linearity test."""

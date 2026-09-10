@@ -57,9 +57,9 @@ class TestMixtureNormal:
             dist = MixtureNormal(p=p, sigma1=0.5)
             rng = np.random.default_rng(42)
             z = dist.simulate(50000, rng)
-            assert (
-                abs(np.var(z) - 1.0) < 0.1
-            ), f"Simulated variance should be ~1 for p={p}, got {np.var(z)}"
+            assert abs(np.var(z) - 1.0) < 0.1, (
+                f"Simulated variance should be ~1 for p={p}, got {np.var(z)}"
+            )
 
     def test_mixture_transform_roundtrip(self) -> None:
         dist = MixtureNormal()
