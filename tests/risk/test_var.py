@@ -171,7 +171,7 @@ class TestFilteredHistoricalDefinition:
 
 
 class TestViolationRateParametric:
-    """The parametric VaR of a fitted model has a violation rate near alpha."""
+    """The parametric VaR of a fitted model has a violation rate near alpha (tol=20%)."""
 
     def test_violation_rate_parametric(self, garch_results: Any) -> None:
         alpha = 0.05
@@ -181,7 +181,7 @@ class TestViolationRateParametric:
         returns = garch_results.mu + garch_results.resid
         violations = float((returns < var_series).mean())
 
-        assert abs(violations - alpha) / alpha < 0.30, (
+        assert abs(violations - alpha) / alpha < 0.20, (
             f"Violation rate {violations:.4f} too far from alpha={alpha}"
         )
 
