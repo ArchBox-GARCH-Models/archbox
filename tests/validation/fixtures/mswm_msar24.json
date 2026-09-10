@@ -1,21 +1,61 @@
 {
-    "description": "MS(2)-AR(4) - MSwM::msmFit on US GDP synthetic data",
-    "r_package": "MSwM",
-    "r_version": "1.5",
-    "dataset": "us_gdp_quarterly",
-    "model": "MS(2)-AR(4)",
+  "description": "MS(2)-AR(4) on the archbox us_gdp dataset (quarterly growth), fitted with R MSwM::msmFit",
+  "r_package": "MSwM",
+  "r_version": "1.5",
+  "r_script": "tests/validation/fixtures/generate_mswm_msar24.R",
+  "command": "Rscript tests/validation/fixtures/generate_mswm_msar24.R",
+  "dataset": "us_gdp (archbox/datasets/data/macro/us_gdp_quarterly.csv, column growth)",
+  "model": "MS(2)-AR(4), switching intercept and variance, common AR coefficients",
+  "conditioning": "the first p=4 observations are conditioned on (nobs_effective = 303); MSwM conditions the same way",
+  "nobs_effective": 303,
+  "regime_order": "regimes sorted by increasing implied mean (regime 0 = low mean)",
+  "loglikelihood_sign": "MSwM@Fit@logLikel holds the negative log-likelihood; it is negated here",
+  "parameters": {
+    "mu_0": -0.31866715166,
+    "mu_1": 0.91024785287,
+    "intercept_0": -0.27800595808,
+    "intercept_1": 0.79410232625,
+    "sigma_0": 1.2954138658,
+    "sigma_1": 0.57767464006,
+    "phi_1": 0.1668471466,
+    "phi_2": 0.012389520055,
+    "phi_3": 0.079448442913,
+    "phi_4": -0.13108741599,
+    "p_00": 0.84416909553,
+    "p_11": 0.93682556891
+  },
+  "loglikelihood": -373.9207304232,
+  "tolerance": {
+    "params_pct": 0.05,
+    "params_abs": 0.1,
+    "loglike_abs": 1.5
+  },
+  "switching_ar_model": {
+    "model": "MS(2)-AR(4), all coefficients switching (sw = rep(TRUE, 6))",
     "parameters": {
-        "mu_0": 0.25,
-        "mu_1": 0.76,
-        "sigma_0": 0.63,
-        "sigma_1": 1.07,
-        "p_00": 0.40,
-        "p_11": 0.59
+      "mu_0": -0.24537599258,
+      "mu_1": 0.991278587,
+      "intercept_0": -0.2151527615,
+      "intercept_1": 0.82647734307,
+      "sigma_0": 1.2203579698,
+      "sigma_1": 0.53184918948,
+      "p_00": 0.80481966626,
+      "p_11": 0.90016280701,
+      "phi_1_0": 0.27721927217,
+      "phi_2_0": -0.041494073613,
+      "phi_3_0": 0.11406566829,
+      "phi_4_0": -0.22661976619,
+      "phi_1_1": 0.02167185363,
+      "phi_2_1": 0.074128336222,
+      "phi_3_1": 0.10515065732,
+      "phi_4_1": -0.034699657957
     },
-    "loglikelihood": -40000000413.9,
+    "loglikelihood": -370.7214541746,
     "tolerance": {
-        "params_pct": 0.10,
-        "loglike_abs": 2.0
-    },
-    "note": "Reference values from MSwM on archbox synthetic US GDP data"
+      "params_pct": 0.05,
+      "params_abs": 0.05,
+      "loglike_abs": 1
+    }
+  },
+  "note": "For the common-AR model MSwM's M-step regresses the pooled regimes on the shared coefficients with weights P(S_t=s|Y_T) only, ignoring the 1/sigma_s^2 factor, so it is not the maximiser of the expected complete-data log-likelihood: archbox's GLS M-step attains a strictly higher likelihood (-372.88 vs -373.92) and the point estimates differ accordingly. Replacing archbox's weights by MSwM's reproduces the MSwM numbers to ~1% (see tests/validation/test_vs_mswm.py::test_msar24_reproduces_mswm_with_mswm_mstep). For the all-switching model both M-steps coincide and the estimates agree."
 }

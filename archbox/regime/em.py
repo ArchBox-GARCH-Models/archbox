@@ -4,6 +4,14 @@ Implements the Expectation-Maximization algorithm for parameter estimation
 in Markov-Switching models. The E-step uses the Hamilton filter and Kim
 smoother; the M-step updates the transition matrix and regime parameters.
 
+All quantities estimated by EM (regime parameters *and* the transition
+matrix) are written back into a single parameter vector whose entries
+match ``model.param_names``, so that ``model.loglike(results.params)``
+reproduces ``results.loglike``.  The initial state distribution is also
+estimated (it is not part of ``params``); it is stored on the model and
+on the results as ``init_probs`` and is used by ``model.loglike`` by
+default once the model has been fitted.
+
 References
 ----------
 Hamilton, J.D. (1989). A New Approach to the Economic Analysis of
@@ -19,6 +27,7 @@ MIT Press.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -30,6 +39,100 @@ from archbox.regime.results import RegimeResults
 
 if TYPE_CHECKING:
     from archbox.regime.base import MarkovSwitchingModel
+
+
+def numerical_hessian(
+    fn: Callable[[NDArray[np.float64]], float],
+    params: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    """Central-difference numerical Hessian of a scalar function.
+
+    Parameters
+    ----------
+    fn : callable
+        Function of the parameter vector.
+    params : ndarray
+        Point at which the Hessian is evaluated, shape (n,).
+
+    Returns
+    -------
+    ndarray
+        Symmetric Hessian matrix, shape (n, n). Entries are NaN if any
+        function evaluation fails or is not finite.
+    """
+    x = np.asarray(params, dtype=np.float64)
+    n = x.size
+    step = 6.06e-6 * np.maximum(np.abs(x), 1e-2)
+    hess = np.zeros((n, n))
+
+    def safe(point: NDArray[np.float64]) -> float:
+        try:
+            val = float(fn(point))
+        except (ValueError, np.linalg.LinAlgError, ZeroDivisionError):
+            return float("nan")
+        return val if np.isfinite(val) else float("nan")
+
+    for i in range(n):
+        for j in range(i, n):
+            ei = np.zeros(n)
+            ej = np.zeros(n)
+            ei[i] = step[i]
+            ej[j] = step[j]
+            f_pp = safe(x + ei + ej)
+            f_pm = safe(x + ei - ej)
+            f_mp = safe(x - ei + ej)
+            f_mm = safe(x - ei - ej)
+            value = (f_pp - f_pm - f_mp + f_mm) / (4.0 * step[i] * step[j])
+            hess[i, j] = value
+            hess[j, i] = value
+
+    return hess
+
+
+def standard_errors(
+    fn: Callable[[NDArray[np.float64]], float],
+    params: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    """Hessian-based standard errors of a log-likelihood at ``params``.
+
+    Parameters
+    ----------
+    fn : callable
+        Log-likelihood as a function of the parameter vector.
+    params : ndarray
+        Estimated parameters.
+
+    Returns
+    -------
+    ndarray
+        Standard errors, shape (n,). NaN where the observed information
+        matrix is not positive definite.
+    """
+    n = np.asarray(params).size
+    nan_out = np.full(n, np.nan)
+
+    hess = numerical_hessian(fn, params)
+    if not np.all(np.isfinite(hess)):
+        return nan_out
+
+    info = -0.5 * (hess + hess.T)
+    try:
+        eigvals = np.linalg.eigvalsh(info)
+    except np.linalg.LinAlgError:
+        return nan_out
+    if np.min(eigvals) <= 0.0:
+        return nan_out
+
+    try:
+        cov = np.linalg.inv(info)
+    except np.linalg.LinAlgError:
+        return nan_out
+
+    diag = np.diag(cov)
+    out = np.full(n, np.nan)
+    positive = diag > 0.0
+    out[positive] = np.sqrt(diag[positive])
+    return out
 
 
 class EMEstimator:
@@ -51,6 +154,7 @@ class EMEstimator:
         maxiter: int = 500,
         tol: float = 1e-8,
         verbose: bool = True,
+        compute_se: bool = True,
     ) -> RegimeResults:
         """Fit a Markov-Switching model using the EM algorithm.
 
@@ -61,21 +165,26 @@ class EMEstimator:
         maxiter : int
             Maximum number of EM iterations.
         tol : float
-            Convergence tolerance (relative change in log-likelihood).
+            Convergence tolerance. The criterion is absolute-or-relative:
+            convergence is declared when the change in log-likelihood is
+            below ``tol`` in absolute terms or below
+            ``tol * max(1, |loglike|)``.
         verbose : bool
             Print progress information.
+        compute_se : bool
+            Compute numerical-Hessian standard errors at the final params.
 
         Returns
         -------
         RegimeResults
             Fitted model results.
         """
-        params = model.start_params.copy()
+        params = np.asarray(model.start_params, dtype=np.float64).copy()
         k = model.k_regimes
+        t_start = model._t_start
 
-        # Initialize transition matrix and initial state probs
         transition_matrix = model._extract_transition_matrix(params)
-        init_probs: NDArray[np.float64] | None = None
+        init_probs = HamiltonFilter.ergodic_probabilities(transition_matrix)
 
         loglike_old = -np.inf
         converged = False
@@ -83,14 +192,9 @@ class EMEstimator:
         iteration = 0
 
         for iteration in range(maxiter):
-            # === E-step ===
-            # Compute regime log-likelihoods for all t, s
-            t_obs = model.nobs
-            regime_loglikes = np.zeros((t_obs, k))
-            for s in range(k):
-                regime_loglikes[:, s] = model._regime_loglike(params, s)
+            # === E-step (conditioning on the first t_start observations) ===
+            regime_loglikes = model._regime_loglikes(params)[t_start:]
 
-            # Hamilton filter (use consistent init_probs)
             filtered, predicted, loglike, _marginal = self.hamilton_filter.filter_vectorized(
                 regime_loglikes, transition_matrix, init_probs
             )
@@ -105,11 +209,9 @@ class EMEstimator:
                 filtered, predicted, smoothed, transition_matrix
             )
 
-            # === Check convergence ===
-            if abs(loglike_old) > 1e-12:
-                rel_change = abs(loglike - loglike_old) / abs(loglike_old)
-            else:
-                rel_change = abs(loglike - loglike_old)
+            # === Check convergence (absolute or relative, sane scale) ===
+            delta = abs(loglike - loglike_old)
+            rel_change = delta / max(1.0, abs(loglike))
 
             if verbose and iteration % 10 == 0:
                 print(
@@ -118,7 +220,7 @@ class EMEstimator:
                     f"rel_change = {rel_change:.2e}"
                 )
 
-            if iteration > 0 and rel_change < tol:
+            if iteration > 0 and (delta < tol or rel_change < tol):
                 converged = True
                 if verbose:
                     print(
@@ -129,47 +231,46 @@ class EMEstimator:
             loglike_old = loglike
 
             # === M-step ===
-            # Update transition matrix
             transition_matrix = self._update_transition_matrix(joint_smoothed, smoothed)
 
-            # Update initial state probabilities from smoothed[0]
-            init_probs = smoothed[0].copy()
-            assert init_probs is not None
-            init_sum = float(init_probs.sum())
-            if init_sum > 0.0:
-                init_probs /= init_sum
-            else:
-                init_probs = np.ones(k) / k
-            init_probs = np.maximum(init_probs, 1e-12)
-            init_probs /= float(init_probs.sum())  # type: ignore[union-attr]
+            init_probs = self._normalize_probs(smoothed[0], k)
 
-            # Update regime-specific parameters
             params = self._m_step(model, params, smoothed, joint_smoothed)
+            # Keep the parameter vector in sync with the EM estimates
+            params = model._set_transition_params(params, transition_matrix)
 
-        # Final E-step for results
-        t_obs = model.nobs
-        regime_loglikes = np.zeros((t_obs, k))
-        for s in range(k):
-            regime_loglikes[:, s] = model._regime_loglike(params, s)
-
+        # === Final E-step with the converged parameters ===
+        regime_loglikes = model._regime_loglikes(params)[t_start:]
         filtered, predicted, loglike, _ = self.hamilton_filter.filter_vectorized(
-            regime_loglikes, transition_matrix
+            regime_loglikes, transition_matrix, init_probs
         )
         smoothed = self.kim_smoother.smooth_vectorized(filtered, predicted, transition_matrix)
 
-        # Build regime params dict
-        regime_params = self._extract_regime_params(model, params)
-
-        # Store transition matrix on model
+        # Persist the fitted state on the model
         model._transition_matrix = transition_matrix
+        model._init_probs = init_probs
+        model._params = params
+        model._last_filtered_probs = filtered[-1].copy()
+        model._is_fitted = True
+
+        std_errs: NDArray[np.float64] | None = None
+        if compute_se:
+            std_errs = standard_errors(lambda p: model.loglike(p, init_probs=init_probs), params)
+
+        regime_params = self._extract_regime_params(model, params)
+        coefficients: list[NDArray[np.float64]] | None = None
+        intercepts: list[NDArray[np.float64]] | None = None
+        coefs = model._regime_coefficients(params)
+        if coefs is not None:
+            coefficients, intercepts = coefs
 
         return RegimeResults(
             params=params,
             regime_params=regime_params,
             transition_matrix=transition_matrix,
-            filtered_probs=filtered,
-            smoothed_probs=smoothed,
-            predicted_probs=predicted,
+            filtered_probs=self._pad(filtered, t_start),
+            smoothed_probs=self._pad(smoothed, t_start),
+            predicted_probs=self._pad(predicted, t_start),
             loglike=loglike,
             nobs=model.nobs,
             k_regimes=k,
@@ -177,7 +278,50 @@ class EMEstimator:
             param_names=model.param_names,
             converged=converged,
             n_iter=iteration + 1,
+            nobs_effective=model.nobs_effective,
+            init_probs=init_probs,
+            std_errors=std_errs,
+            coefficients=coefficients,
+            intercepts=intercepts,
         )
+
+    @staticmethod
+    def _normalize_probs(row: NDArray[np.float64], k: int) -> NDArray[np.float64]:
+        """Normalize a (possibly unnormalized) probability vector."""
+        probs = np.maximum(np.asarray(row, dtype=np.float64).copy(), 0.0)
+        total = float(probs.sum())
+        if total <= 0.0:
+            return np.ones(k) / k
+        probs /= total
+        probs = np.maximum(probs, 1e-12)
+        probs /= float(probs.sum())
+        return probs
+
+    @staticmethod
+    def _pad(probs: NDArray[np.float64], t_start: int) -> NDArray[np.float64]:
+        """Pad probability paths back to the full sample length.
+
+        The first ``t_start`` observations are conditioned on and carry
+        no filtered/smoothed information; they are filled with the first
+        available row so that all arrays have shape (T, k) and every row
+        still sums to one.
+
+        Parameters
+        ----------
+        probs : ndarray
+            Probabilities over the effective sample, shape (T-t_start, k).
+        t_start : int
+            Number of conditioned-on observations.
+
+        Returns
+        -------
+        ndarray
+            Shape (T, k).
+        """
+        if t_start <= 0:
+            return probs
+        pad = np.repeat(probs[:1], t_start, axis=0)
+        return np.vstack([pad, probs])
 
     @staticmethod
     def _smooth_unnormalized(
@@ -204,9 +348,9 @@ class EMEstimator:
         ndarray
             Smoothed probabilities, shape (T, k).
         """
-        n_obs, k = filtered_probs.shape
+        n_obs = filtered_probs.shape[0]
         trans = transition_matrix
-        smoothed = np.zeros((n_obs, k))
+        smoothed = np.zeros_like(filtered_probs)
         smoothed[-1] = filtered_probs[-1]
 
         for t in range(n_obs - 2, -1, -1):
@@ -245,19 +389,11 @@ class EMEstimator:
         ndarray
             Joint smoothed probabilities, shape (T-1, k, k).
         """
-        n_obs, k = filtered_probs.shape
         trans = transition_matrix
-        joint = np.zeros((n_obs - 1, k, k))
-
-        for t in range(n_obs - 1):
-            pred_safe = np.maximum(predicted_probs[t + 1], 1e-300)
-            for i in range(k):
-                for j in range(k):
-                    joint[t, i, j] = (
-                        filtered_probs[t, i] * trans[i, j] * smoothed_probs[t + 1, j] / pred_safe[j]
-                    )
-
-        return joint
+        pred_safe = np.maximum(predicted_probs[1:], 1e-300)
+        ratio = smoothed_probs[1:] / pred_safe  # (T-1, k)
+        # joint[t, i, j] = filtered[t, i] * P[i, j] * ratio[t+1, j]
+        return filtered_probs[:-1, :, None] * trans[None, :, :] * ratio[:, None, :]
 
     def _update_transition_matrix(
         self,
@@ -287,8 +423,7 @@ class EMEstimator:
         for i in range(k):
             denom = smoothed[:-1, i].sum()
             if denom > 1e-12:
-                for j in range(k):
-                    p_new[i, j] = joint_smoothed[:, i, j].sum() / denom
+                p_new[i] = joint_smoothed[:, i, :].sum(axis=0) / denom
             else:
                 p_new[i] = 1.0 / k
 
@@ -308,7 +443,7 @@ class EMEstimator:
     ) -> NDArray[np.float64]:
         """M-step: update regime-specific parameters.
 
-        If the model has a custom _m_step method, use it.
+        If the model has a custom ``_m_step_update`` method, use it.
         Otherwise, use a generic M-step for mean/variance models.
 
         Parameters
@@ -318,9 +453,11 @@ class EMEstimator:
         params : ndarray
             Current parameter vector.
         smoothed : ndarray
-            Smoothed probabilities, shape (T, k).
+            Smoothed probabilities over the effective sample,
+            shape (T - t_start, k); row 0 corresponds to observation
+            ``t = model._t_start``.
         joint_smoothed : ndarray
-            Joint smoothed probabilities, shape (T-1, k, k).
+            Joint smoothed probabilities, shape (T - t_start - 1, k, k).
 
         Returns
         -------
@@ -350,7 +487,7 @@ class EMEstimator:
         params : ndarray
             Current parameters.
         smoothed : ndarray
-            Smoothed probabilities, shape (T, k).
+            Smoothed probabilities, shape (T - t_start, k).
 
         Returns
         -------
@@ -358,7 +495,7 @@ class EMEstimator:
             Updated parameters.
         """
         k = model.k_regimes
-        y = model.endog
+        y = model.endog[model._t_start :]
         new_params = params.copy()
 
         # Update means

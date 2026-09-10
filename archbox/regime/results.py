@@ -45,6 +45,20 @@ class RegimeResults:
         Whether estimation converged.
     n_iter : int
         Number of iterations to convergence.
+    nobs_effective : int
+        Number of observations entering the likelihood (``nobs`` minus
+        the observations conditioned on).
+    init_probs : NDArray[np.float64] | None
+        Estimated initial state distribution.
+    std_errors : NDArray[np.float64] | None
+        Numerical-Hessian standard errors (NaN when the observed
+        information matrix is not positive definite).
+    coefficients : list[NDArray[np.float64]] | None
+        Autoregressive coefficient matrices per regime (MS-AR, MS-VAR).
+    intercepts : list[NDArray[np.float64]] | None
+        Intercepts per regime (MS-AR, MS-VAR).
+    conditional_variances : NDArray[np.float64] | None
+        Regime conditional variances, shape (T, k) (MS-GARCH).
     """
 
     def __init__(
@@ -62,6 +76,12 @@ class RegimeResults:
         param_names: list[str] | None = None,
         converged: bool = True,
         n_iter: int = 0,
+        nobs_effective: int | None = None,
+        init_probs: NDArray[np.float64] | None = None,
+        std_errors: NDArray[np.float64] | None = None,
+        coefficients: list[NDArray[np.float64]] | None = None,
+        intercepts: list[NDArray[np.float64]] | None = None,
+        conditional_variances: NDArray[np.float64] | None = None,
     ) -> None:
         """Initialize regime switching results container."""
         self.params = params
@@ -72,16 +92,55 @@ class RegimeResults:
         self.predicted_probs = predicted_probs
         self.loglike = loglike
         self.nobs = nobs
+        self.nobs_effective = nobs if nobs_effective is None else nobs_effective
         self.k_regimes = k_regimes
         self.n_params = len(params)
         self.model_name = model_name
         self.param_names = param_names or [f"param_{i}" for i in range(len(params))]
         self.converged = converged
         self.n_iter = n_iter
+        self.init_probs = init_probs
+        self.std_errors = std_errors
+        self.coefficients = coefficients
+        self.intercepts = intercepts
+        self.conditional_variances = conditional_variances
 
-        # Information criteria
+        # Information criteria (based on the effective sample size)
         self.aic = -2.0 * loglike + 2.0 * self.n_params
-        self.bic = -2.0 * loglike + np.log(nobs) * self.n_params
+        self.bic = -2.0 * loglike + np.log(self.nobs_effective) * self.n_params
+
+    @property
+    def loglikelihood(self) -> float:
+        """Alias for :attr:`loglike`."""
+        return self.loglike
+
+    @property
+    def n_regimes(self) -> int:
+        """Alias for :attr:`k_regimes`."""
+        return self.k_regimes
+
+    def param_table(self) -> str:
+        """Format parameters with standard errors.
+
+        Returns
+        -------
+        str
+            One line per parameter with estimate, standard error and
+            t-statistic (nan when standard errors are unavailable).
+        """
+        lines = [f"  {'Parameter':<20s} {'Estimate':>12s} {'Std.Err':>12s} {'t-stat':>10s}"]
+        lines.append("-" * 65)
+        se = self.std_errors
+        for i, name in enumerate(self.param_names):
+            if i >= len(self.params):
+                break
+            est = float(self.params[i])
+            if se is not None and i < len(se) and np.isfinite(se[i]) and se[i] > 0:
+                tval = est / float(se[i])
+                lines.append(f"  {name:<20s} {est:12.6f} {float(se[i]):12.6f} {tval:10.3f}")
+            else:
+                lines.append(f"  {name:<20s} {est:12.6f} {'nan':>12s} {'nan':>10s}")
+        return "\n".join(lines)
 
     def summary(self) -> str:
         """Generate a formatted summary table.
@@ -98,6 +157,7 @@ class RegimeResults:
         lines.append(f"  {self.model_name} Results")
         lines.append(sep)
         lines.append(f"  Observations:    {self.nobs}")
+        lines.append(f"  Effective obs:   {self.nobs_effective}")
         lines.append(f"  Regimes:         {self.k_regimes}")
         lines.append(f"  Parameters:      {self.n_params}")
         lines.append(f"  Log-Likelihood:  {self.loglike:.4f}")
@@ -114,6 +174,10 @@ class RegimeResults:
             lines.append(f"  Regime {regime}:")
             for name, value in rparams.items():
                 lines.append(f"    {name:20s} = {value:12.6f}")
+        lines.append("")
+
+        # Parameter table with standard errors
+        lines.append(self.param_table())
         lines.append("")
 
         # Transition matrix

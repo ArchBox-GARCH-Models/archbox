@@ -288,3 +288,140 @@ class TestEMResults:
         labels = results.classify()
         assert labels.shape == (len(y),)
         assert set(labels.tolist()).issubset({0, 1})
+
+
+class TestEMParameterWriteback:
+    """All EM estimates must land in a single parameter vector."""
+
+    def test_params_hold_the_transition_matrix(
+        self,
+        simulated_two_regime_data: tuple[
+            np.ndarray, np.ndarray, np.ndarray, list[float], list[float]
+        ],
+    ) -> None:
+        """results.params must decode to results.transition_matrix."""
+        y, _, _, _, _ = simulated_two_regime_data
+        model = SimpleMSMean(y, k_regimes=2)
+        results = EMEstimator().fit(model, maxiter=200, tol=1e-10, verbose=False)
+
+        decoded = model._extract_transition_matrix(results.params)
+        np.testing.assert_allclose(decoded, results.transition_matrix, atol=1e-10)
+        assert len(results.params) == len(results.param_names)
+
+    def test_loglike_of_params_matches_results(
+        self,
+        simulated_two_regime_data: tuple[
+            np.ndarray, np.ndarray, np.ndarray, list[float], list[float]
+        ],
+    ) -> None:
+        """model.loglike(results.params) == results.loglike."""
+        y, _, _, _, _ = simulated_two_regime_data
+        model = SimpleMSMean(y, k_regimes=2)
+        results = EMEstimator().fit(model, maxiter=200, tol=1e-10, verbose=False)
+
+        assert model.loglike(results.params) == pytest.approx(results.loglike, abs=1e-9)
+
+    def test_final_estep_uses_converged_params(
+        self,
+        simulated_two_regime_data: tuple[
+            np.ndarray, np.ndarray, np.ndarray, list[float], list[float]
+        ],
+    ) -> None:
+        """Reproducing the filter from results.params gives the stored probs."""
+        from archbox.regime.hamilton_filter import HamiltonFilter
+
+        y, _, _, _, _ = simulated_two_regime_data
+        model = SimpleMSMean(y, k_regimes=2)
+        results = EMEstimator().fit(model, maxiter=200, tol=1e-10, verbose=False)
+
+        regime_lls = model._regime_loglikes(results.params)
+        filtered, _, loglike, _ = HamiltonFilter().filter_vectorized(
+            regime_lls, results.transition_matrix, results.init_probs
+        )
+        np.testing.assert_allclose(filtered, results.filtered_probs, atol=1e-10)
+        assert loglike == pytest.approx(results.loglike, abs=1e-9)
+
+    def test_standard_errors_are_finite(
+        self,
+        simulated_two_regime_data: tuple[
+            np.ndarray, np.ndarray, np.ndarray, list[float], list[float]
+        ],
+    ) -> None:
+        """Hessian-based standard errors are available and positive."""
+        y, _, _, _, _ = simulated_two_regime_data
+        model = SimpleMSMean(y, k_regimes=2)
+        results = EMEstimator().fit(model, maxiter=200, tol=1e-10, verbose=False)
+
+        assert results.std_errors is not None
+        assert results.std_errors.shape == results.params.shape
+        assert np.all(np.isfinite(results.std_errors))
+        assert np.all(results.std_errors > 0)
+        # the regime means are precisely estimated on well-separated data
+        assert results.std_errors[0] < 0.2
+
+    def test_standard_errors_nan_when_not_identified(self) -> None:
+        """SEs are NaN (not garbage) when the information matrix is singular."""
+        from archbox.regime.em import standard_errors
+
+        params = np.array([1.0, 2.0])
+
+        def flat(_p: np.ndarray) -> float:
+            return 0.0
+
+        se = standard_errors(flat, params)
+        assert se.shape == (2,)
+        assert np.all(np.isnan(se))
+
+
+class TestEMConvergenceCriterion:
+    """The convergence test must be absolute-or-relative on a sane scale."""
+
+    def test_no_premature_convergence_on_ms_ar(self) -> None:
+        """MS-AR must not declare convergence after one update."""
+        from archbox.datasets import load_dataset
+        from archbox.regime.ms_ar import MarkovSwitchingAR
+
+        y = load_dataset("us_gdp")["growth"].dropna().to_numpy(dtype=np.float64)
+        model = MarkovSwitchingAR(y, k_regimes=2, order=4)
+        estimator = EMEstimator()
+        results = estimator.fit(model, maxiter=500, tol=1e-8, verbose=False)
+
+        assert results.converged
+        assert results.n_iter > 5, f"EM stopped after {results.n_iter} iterations"
+        # no -1e10 sentinel anywhere: a sane per-observation log-likelihood
+        assert -3.0 < results.loglike / results.nobs_effective < 0.0
+        history = estimator.loglike_history
+        assert history[-1] > history[0] + 1.0
+
+    def test_absolute_criterion_stops_flat_progress(self) -> None:
+        """A tiny absolute change stops EM even on a large-|loglike| scale."""
+        rng = np.random.default_rng(7)
+        # very large series => |loglike| in the tens of thousands
+        y = np.concatenate([rng.normal(-3, 1, 8000), rng.normal(3, 1, 8000)])
+        model = SimpleMSMean(y, k_regimes=2)
+        estimator = EMEstimator()
+        results = estimator.fit(model, maxiter=300, tol=1e-8, verbose=False)
+
+        assert results.converged
+        history = estimator.loglike_history
+        assert abs(history[-1] - history[-2]) < 1e-8 * max(1.0, abs(history[-1]))
+
+
+class TestEMEffectiveSample:
+    """Effective sample size drives the information criteria."""
+
+    def test_nobs_effective_for_ms_ar(self) -> None:
+        """MS-AR(p) conditions on the first p observations."""
+        from archbox.regime.ms_ar import MarkovSwitchingAR
+
+        rng = np.random.default_rng(9)
+        y = rng.standard_normal(300)
+        model = MarkovSwitchingAR(y, k_regimes=2, order=4)
+        results = model.fit(maxiter=50, tol=1e-6, verbose=False)
+
+        assert model.nobs_effective == 296
+        assert results.nobs == 300
+        assert results.nobs_effective == 296
+        expected_bic = -2.0 * results.loglike + np.log(296) * results.n_params
+        assert results.bic == pytest.approx(expected_bic)
+        assert results.filtered_probs.shape == (300, 2)
